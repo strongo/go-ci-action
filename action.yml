@@ -23,10 +23,13 @@ runs:
 #       shell: bash
       
     - run: go get ./...
+      shell: bash
 
     - run: go vet ./...
+      shell: bash
 
     - run: go test ./...
+      shell: bash
 
 #     - name: Go build
 #       run: go build ./...
