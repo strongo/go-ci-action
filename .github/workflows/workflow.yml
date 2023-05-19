@@ -6,6 +6,10 @@ on:
       gh_token:
         required: true
     inputs:
+      disable-version-bumping: # id of input
+        type: boolean
+        description: 'Disables version bumping - use for apps that are not versioned'
+        required: false
       lint-timeout: # id of input
         type: string
         description: 'How long to wait for lint to complete before failing'
@@ -67,9 +71,9 @@ jobs:
         # Optional: if set to true then the action don't cache or restore ~/.cache/go-build.
         # skip-build-cache: true
 
-    - if: ${{ github.ref == 'refs/heads/main' }}
-      name: Bump version and push tag
+    - if: ${{ !inputs.disable-version-bumping && github.ref == 'refs/heads/main' }}
       id: tag_version
+      name: Bump version and push tag
       uses: mathieudutour/github-tag-action@v6.1
       with:
         github_token: ${{ secrets.gh_token }}
