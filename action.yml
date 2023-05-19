@@ -5,6 +5,9 @@ inputs:
     description: 'How long to wait for lint to complete before failing'
     required: false
     default: '3m'
+  github_token:
+    description: 'GitHub secret token'
+    required: true
 
 runs:
   using: "composite"
@@ -54,4 +57,4 @@ runs:
       id: tag_version
       uses: mathieudutour/github-tag-action@v6.1
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        github_token: ${{ inputs.github_token }}
