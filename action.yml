@@ -58,3 +58,4 @@ runs:
       uses: mathieudutour/github-tag-action@v6.1
       with:
         github_token: ${{ inputs.github_token }}
+        default_bump: false
