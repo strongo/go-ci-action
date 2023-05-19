@@ -3,7 +3,7 @@ name: Standard Go CI workflow
 on:
   workflow_call:
     secrets:
-      github_token:
+      gh_token:
         required: true
     inputs:
       lint-timeout: # id of input
