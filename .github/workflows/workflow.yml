@@ -5,8 +5,10 @@ on:
     secrets:
       gh_token:
         required: true
+        type: string
     inputs:
       lint-timeout: # id of input
+        type: string
         description: 'How long to wait for lint to complete before failing'
         required: false
         default: '3m'
