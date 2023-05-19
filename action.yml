@@ -1,38 +1,26 @@
-name: 'Continious integration for Go modules'
+name: 'Continuous integration for Go modules'
 description: 'Test pipeline for Go modules'
 inputs:
   lint-timeout:  # id of input
     description: 'How long to wait for lint to complete before failing'
     required: false
     default: '3m'
-# outputs:
-#   random-number:
-#     description: "Random number"
-#     value: ${{ steps.random-number-generator.outputs.random-number }}
+
 runs:
   using: "composite"
   steps:
-#     - run: echo Hello ${{ inputs.who-to-greet }}.
-#       shell: bash
-#     - id: random-number-generator
-#       run: echo "random-number=$(echo $RANDOM)" >> $GITHUB_OUTPUT
-#       shell: bash
-#     - run: echo "${{ github.action_path }}" >> $GITHUB_PATH
-#       shell: bash
-#     - run: goodbye.sh
-#       shell: bash
-      
+
     - run: go get ./...
       shell: bash
 
     - run: go vet ./...
       shell: bash
 
-    - run: go test ./...
+    - run: go build ./...
       shell: bash
 
-#     - name: Go build
-#       run: go build ./...
+    - run: go test ./...
+      shell: bash
 
     - name: Go lint
       uses: golangci/golangci-lint-action@v3
