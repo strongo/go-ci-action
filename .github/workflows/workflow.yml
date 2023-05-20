@@ -46,9 +46,6 @@ jobs:
       - run: go vet ./...
         shell: bash
 
-      - run: go test ./...
-        shell: bash
-
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
@@ -79,6 +76,9 @@ jobs:
       - if: ${{ inputs.install-firebase-tools }}
         name: Install Firebase tools
         run: curl -sL firebase.tools | bash
+
+      - run: go test ./...
+        shell: bash
 
       - if: ${{ !inputs.disable-version-bumping && github.ref == 'refs/heads/main' }}
         id: tag_version
