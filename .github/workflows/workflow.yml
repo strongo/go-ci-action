@@ -20,6 +20,14 @@ on:
         description: 'How long to wait for lint to complete before failing'
         required: false
         default: '3m'
+      FIREBASE_PROJECT_ID:
+        type: string
+        description: 'Firebase project ID'
+        required: false
+      GOOGLE_APPLICATION_CREDENTIALS:
+        type: string
+        description: 'Path to Google Application Credentials file'
+        required: false
 
 jobs:
 
@@ -79,6 +87,9 @@ jobs:
 
       - run: go test ./...
         shell: bash
+        env:
+          FIREBASE_PROJECT_ID: ${{ inputs.FIREBASE_PROJECT_ID }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ inputs.GOOGLE_APPLICATION_CREDENTIALS }}
 
       - if: ${{ !inputs.disable-version-bumping && github.ref == 'refs/heads/main' }}
         id: tag_version
