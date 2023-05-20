@@ -10,6 +10,11 @@ on:
         type: boolean
         description: 'Disables version bumping - use for apps that are not versioned'
         required: false
+      install-firebase-tools: # id of input
+        type: boolean
+        description: 'Installs Firebase tools'
+        required: false
+        default: false
       lint-timeout: # id of input
         type: string
         description: 'How long to wait for lint to complete before failing'
@@ -24,57 +29,61 @@ jobs:
       contents: write
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Install Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '^1.20'
+      - name: Install Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '^1.20'
 
-    - run: go get ./...
-      shell: bash
+      - run: go get ./...
+        shell: bash
 
-    - run: go build ./...
-      shell: bash
+      - run: go build ./...
+        shell: bash
 
-    - run: go vet ./...
-      shell: bash
+      - run: go vet ./...
+        shell: bash
 
-    - run: go test ./...
-      shell: bash
+      - run: go test ./...
+        shell: bash
 
-    - name: golangci-lint
-      uses: golangci/golangci-lint-action@v3
-      with:
-        # Optional: version of golangci-lint to use in form of v1.2 or v1.2.3 or `latest` to use the latest version
-        version: latest
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          # Optional: version of golangci-lint to use in form of v1.2 or v1.2.3 or `latest` to use the latest version
+          version: latest
 
-        args: --timeout=${{ inputs.lint-timeout }} --print-issued-lines=true
+          args: --timeout=${{ inputs.lint-timeout }} --print-issued-lines=true
 
-        # Optional: working directory, useful for monorepos
-        # working-directory: some_dir
+          # Optional: working directory, useful for monorepos
+          # working-directory: some_dir
 
-        # Optional: golangci-lint command line arguments.
-        # args: --issues-exit-code=0
+          # Optional: golangci-lint command line arguments.
+          # args: --issues-exit-code=0
 
-        # Optional: show only new issues if it's a pull request. The default value is `false`.
-        # only-new-issues: true
+          # Optional: show only new issues if it's a pull request. The default value is `false`.
+          # only-new-issues: true
 
-        # Optional: if set to true then the all caching functionality will be complete disabled,
-        #           takes precedence over all other caching options.
-        # skip-cache: true
+          # Optional: if set to true then the all caching functionality will be complete disabled,
+          #           takes precedence over all other caching options.
+          # skip-cache: true
 
-        # Optional: if set to true then the action don't cache or restore ~/go/pkg.
-        skip-pkg-cache: true
+          # Optional: if set to true then the action don't cache or restore ~/go/pkg.
+          skip-pkg-cache: true
 
-        # Optional: if set to true then the action don't cache or restore ~/.cache/go-build.
-        # skip-build-cache: true
+          # Optional: if set to true then the action don't cache or restore ~/.cache/go-build.
+          # skip-build-cache: true
 
-    - if: ${{ !inputs.disable-version-bumping && github.ref == 'refs/heads/main' }}
-      id: tag_version
-      name: Bump version and push tag
-      uses: mathieudutour/github-tag-action@v6.1
-      with:
-        github_token: ${{ secrets.gh_token }}
-        default_bump: false
+      - if: ${{ inputs.install-firebase-tools }}
+        name: Install Firebase tools
+        run: curl -sL firebase.tools | bash
+
+      - if: ${{ !inputs.disable-version-bumping && github.ref == 'refs/heads/main' }}
+        id: tag_version
+        name: Bump version and push tag
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.gh_token }}
+          default_bump: false
