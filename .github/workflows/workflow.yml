@@ -90,7 +90,7 @@ jobs:
         name: Install Firebase tools
         run: curl -sL firebase.tools | bash
 
-      - if: ${{ !secrets.COVERALLS_REPO_TOKEN || github.ref != 'refs/heads/main' }}
+      - if: ${{ !inputs.code_coverage || github.ref != 'refs/heads/main' }}
         run: go test ./...
         name: Run tests without coverage
         shell: bash
