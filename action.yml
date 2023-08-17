@@ -8,6 +8,9 @@ inputs:
   github_token:
     description: 'GitHub secret token'
     required: true
+  code_coverage:
+    description: set to `true` to run code coverage with Coveralls 
+    required: false
 
 runs:
   using: "composite"
@@ -59,3 +62,8 @@ runs:
       with:
         github_token: ${{ inputs.github_token }}
         default_bump: false
+
+    - if: ${{ inputs.code_coverage }}
+      name: Code coverage by Coveralls
+      github_token: ${{ inputs.github_token }}
+      uses: coverallsapp/github-action@v2
