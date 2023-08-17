@@ -89,7 +89,17 @@ jobs:
         name: Install Firebase tools
         run: curl -sL firebase.tools | bash
 
-      - run: go test ./...
+      - if: ${{ !inputs.code_coverage || github.ref != 'refs/heads/main' }}
+        run: go test ./...
+        name: Run tests without coverage
+        shell: bash
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/${{ inputs.GOOGLE_APPLICATION_CREDENTIALS }}
+
+      - if: ${{ inputs.code_coverage && github.ref == 'refs/heads/main' }}
+        name: Run tests with coverage
+        run: go test -v -coverprofile=profile.cov ./...
         shell: bash
         env:
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
@@ -103,6 +113,7 @@ jobs:
           github_token: ${{ secrets.gh_token }}
           default_bump: false
 
-      - if: ${{ inputs.code_coverage && github.ref == 'refs/heads/main' }}
-        name: Coveralls
-        uses: coverallsapp/github-action@v2
+      - if: ${{ !inputs.code_coverage && github.ref == 'refs/heads/main' }}
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: profile.cov
