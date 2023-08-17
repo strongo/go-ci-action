@@ -7,6 +7,8 @@ on:
         required: true
       FIREBASE_PROJECT_ID:
         required: false
+      COVERALLS_REPO_TOKEN:
+        required: false
     inputs:
       disable-version-bumping: # id of input
         type: boolean
@@ -15,11 +17,6 @@ on:
       install-firebase-tools: # id of input
         type: boolean
         description: 'Installs Firebase tools'
-        required: false
-        default: false
-      code_coverage:
-        description: Run code coverage report with Coveralls
-        type: boolean
         required: false
         default: false
       lint-timeout: # id of input
@@ -89,7 +86,7 @@ jobs:
         name: Install Firebase tools
         run: curl -sL firebase.tools | bash
 
-      - if: ${{ !inputs.code_coverage || github.ref != 'refs/heads/main' }}
+      - if: ${{ !secrets.COVERALLS_REPO_TOKEN || github.ref != 'refs/heads/main' }}
         run: go test ./...
         name: Run tests without coverage
         shell: bash
@@ -97,7 +94,7 @@ jobs:
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/${{ inputs.GOOGLE_APPLICATION_CREDENTIALS }}
 
-      - if: ${{ inputs.code_coverage && github.ref == 'refs/heads/main' }}
+      - if: ${{ secrets.COVERALLS_REPO_TOKEN && github.ref == 'refs/heads/main' }}
         name: Run tests with coverage
         run: go test -v -coverprofile=profile.cov ./...
         shell: bash
@@ -113,11 +110,17 @@ jobs:
           github_token: ${{ secrets.gh_token }}
           default_bump: false
 
-      - if: ${{ inputs.code_coverage && github.ref == 'refs/heads/main' }}
-        name: Send test coverage to Coveralls
-        uses: coverallsapp/github-action@v2
-      
-      # - if: ${{ !inputs.code_coverage && github.ref == 'refs/heads/main' }}
-      #   uses: shogo82148/actions-goveralls@v1
+      # - if: ${{ secrets.COVERALLS_REPO_TOKEN && github.ref == 'refs/heads/main' }}
+      #   name: Send test coverage to Coveralls
+      #   uses: coverallsapp/github-action@v2
       #   with:
+      #     github_token: ${{ secrets.gh_token }}
+      #     COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
       #     path-to-profile: profile.cov
+      
+      - if: ${{ secrets.COVERALLS_REPO_TOKEN && github.ref == 'refs/heads/main' }}
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          github_token: ${{ secrets.gh_token }}
+          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+          path-to-profile: profile.cov
