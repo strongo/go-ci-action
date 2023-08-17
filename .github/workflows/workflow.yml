@@ -113,7 +113,10 @@ jobs:
           github_token: ${{ secrets.gh_token }}
           default_bump: false
 
-      - if: ${{ !inputs.code_coverage && github.ref == 'refs/heads/main' }}
-        uses: shogo82148/actions-goveralls@v1
-        with:
-          path-to-profile: profile.cov
+      - name: Sent test coverage to Coveralls
+        uses: coverallsapp/github-action@v2
+      
+      # - if: ${{ !inputs.code_coverage && github.ref == 'refs/heads/main' }}
+      #   uses: shogo82148/actions-goveralls@v1
+      #   with:
+      #     path-to-profile: profile.cov
