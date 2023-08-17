@@ -17,6 +17,11 @@ on:
         description: 'Installs Firebase tools'
         required: false
         default: false
+      code_coverage:
+        description: Run code coverage report with Coveralls
+        type: boolean
+        required: false
+        default: false
       lint-timeout: # id of input
         type: string
         description: 'How long to wait for lint to complete before failing'
@@ -97,3 +102,7 @@ jobs:
         with:
           github_token: ${{ secrets.gh_token }}
           default_bump: false
+
+      - if: ${{ inputs.code_coverage && github.ref == 'refs/heads/main' }}
+        name: Coveralls
+        uses: coverallsapp/github-action@v2
