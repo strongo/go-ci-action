@@ -106,15 +106,6 @@ jobs:
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/${{ inputs.GOOGLE_APPLICATION_CREDENTIALS }}
 
-      - if: ${{ !inputs.disable-version-bumping && github.ref == 'refs/heads/main' }}
-        id: tag_version
-        name: Bump version and push tag
-        uses: mathieudutour/github-tag-action@v6.1
-          
-        with:
-          github_token: ${{ secrets.gh_token }}
-          default_bump: false
-
       # - if: ${{ inputs.code_coverage && github.ref == 'refs/heads/main' }}
       #   name: Send test coverage to Coveralls
       #   uses: coverallsapp/github-action@v2
@@ -124,7 +115,7 @@ jobs:
       #     github_token: ${{ secrets.gh_token }}
       #     COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
       #     path-to-profile: profile.cov
-      
+
       - if: ${{ inputs.code_coverage && github.ref == 'refs/heads/main' }}
         uses: shogo82148/actions-goveralls@v1
         env:
@@ -140,3 +131,13 @@ jobs:
       #   uses: sourcegraph/lsif-upload-action@master
       #   with:
       #     github_token: ${{ secrets.gh_token }}
+
+      - if: ${{ !inputs.disable-version-bumping && github.ref == 'refs/heads/main' }}
+        id: tag_version
+        name: Bump version and push tag
+        uses: mathieudutour/github-tag-action@v6.1
+
+        with:
+          github_token: ${{ secrets.gh_token }}
+          default_bump: false
+
