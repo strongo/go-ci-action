@@ -32,6 +32,11 @@ on:
         type: string
         description: 'Path to Google Application Credentials file'
         required: false
+      GOPRIVATE:
+        type: string
+        description: 'List of private Go modules'
+        required: false
+        default: ''
 
 jobs:
 
@@ -51,6 +56,8 @@ jobs:
 
       - run: go get ./...
         shell: bash
+        env:
+          GOPRIVATE: ${{ inputs.GOPRIVATE }}
 
       - run: go build ./...
         shell: bash
