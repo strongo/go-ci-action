@@ -58,9 +58,7 @@ jobs:
 
       - name: Set GitHub access token for GOPRIVATE (try 2)
         if: ${{ inputs.GOPRIVATE }}
-        # env:
-        #   GH_ACCESS_TOKEN: ${{ secrets.GITHUB_ACCESS_TOKEN }}
-        run: git config --global url."https://${{ secrets.GITHUB_ACCESS_TOKEN }}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+        run: git config --global url."https://${{ secrets.GH_ACCESS_TOKEN }}:x-oauth-basic@github.com/sneat-co".insteadOf "https://github.com/sneat-co"
 
       - run: go get ./...
         shell: bash
