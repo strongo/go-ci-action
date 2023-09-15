@@ -57,7 +57,7 @@ jobs:
           go-version: '^1.20'
 
       - name: Set GitHub access token for GOPRIVATE
-        if: ${{ inputs.GOPRIVATE && secrets.GH_ACCESS_TOKEN }}
+        if: ${{ inputs.GOPRIVATE }}
         run: git config --global url.https://${{ secrets.gh_token }}@github.com/.insteadOf https://github.com/
 
       - run: go get ./...
