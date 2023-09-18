@@ -39,6 +39,10 @@ on:
         description: 'List of private Go modules'
         required: false
         default: ''
+      additional_go_test_path:
+        type: string
+        required: false
+        description: Path a module to sub-module to be tested in form of "./module_dir"
 
 jobs:
 
@@ -106,6 +110,14 @@ jobs:
       - if: ${{ !inputs.code_coverage || github.ref != 'refs/heads/main' }}
         run: go test ./...
         name: Run tests without coverage
+        shell: bash
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/${{ inputs.GOOGLE_APPLICATION_CREDENTIALS }}
+
+      - if: ${{ inputs.additional_go_test_path }}
+        run: go test ${{ inputs.additional_go_test_path }}
+        name: Run additional go test
         shell: bash
         env:
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
