@@ -65,5 +65,6 @@ runs:
 
     - if: ${{ inputs.code_coverage }}
       name: Code coverage by Coveralls
-      github_token: ${{ inputs.github_token }}
       uses: coverallsapp/github-action@v2
+      with:
+        github-token: ${{ inputs.github_token }}
