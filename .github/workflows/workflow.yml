@@ -3,10 +3,8 @@ name: Standard Go CI workflow
 on:
   workflow_call:
     secrets:
-      gh_token:
+      GH_TOKEN:
         required: true
-      GH_ACCESS_TOKEN:
-        required: false
       FIREBASE_PROJECT_ID:
         required: false
       COVERALLS_REPO_TOKEN:
@@ -62,7 +60,7 @@ jobs:
 
       - name: Set GitHub access token for GOPRIVATE
         if: ${{ inputs.GOPRIVATE }}
-        run: git config --global url."https://${{ secrets.GH_ACCESS_TOKEN }}:x-oauth-basic@github.com/sneat-co".insteadOf "https://github.com/sneat-co"
+        run: git config --global url."https://${{ secrets.GH_TOKEN }}:x-oauth-basic@github.com/sneat-co".insteadOf "https://github.com/sneat-co"
 
       - run: go get ./...
         shell: bash
