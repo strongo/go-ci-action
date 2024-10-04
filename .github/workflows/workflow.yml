@@ -57,7 +57,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           cache: false
-#          go-version: '^1.23'
+          go-version: '1.23.2'
 
       - name: Set GitHub access token for GOPRIVATE
         if: ${{ inputs.GOPRIVATE }}
