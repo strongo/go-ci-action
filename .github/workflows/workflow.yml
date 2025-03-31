@@ -80,7 +80,7 @@ jobs:
         with:
           version: v2.0
 
-          args: --timeout=${{ inputs.lint-timeout }} --print-issued-lines=true
+          args: --timeout=${{ inputs.lint-timeout }}
 
           # Optional: working directory, useful for monorepos
           # working-directory: some_dir
