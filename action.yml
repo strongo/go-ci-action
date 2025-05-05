@@ -29,9 +29,9 @@ runs:
       shell: bash
 
     - name: Go lint
-      uses: golangci/golangci-lint-action@v7
+      uses: golangci/golangci-lint-action@v8
       with:
-        version: v2.0
+#        version: v2.0
         args: --timeout=${{ inputs.lint-timeout }}
 
         # Optional: working directory, useful for monorepos
