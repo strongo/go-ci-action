@@ -23,8 +23,8 @@ on:
 jobs:
 
   strongo_workflow:
-    permissions:
-      contents: write
+#    permissions:
+#      contents: write
     uses: strongo/go-ci-action/.github/workflows/workflow.yml@main
 
     secrets:
