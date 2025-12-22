@@ -99,6 +99,14 @@ jobs:
           # skip-build-cache: true
 
       - if: ${{ inputs.install-firebase-tools }}
+        name: Set up Java JRE 24
+        uses: actions/setup-java@v5
+        with:
+          java-version: '24'
+          java-package: 'jre'
+          distribution: 'temurin'
+
+      - if: ${{ inputs.install-firebase-tools }}
         name: Install Firebase tools
         run: curl -sL firebase.tools | bash
 
