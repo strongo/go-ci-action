@@ -41,6 +41,10 @@ on:
         type: string
         required: false
         description: Path a module to sub-module to be tested in form of "./module_dir"
+      min_test_coverage_percent:
+        type: number
+        required: false
+        description: 'Minimum test coverage percentage required to pass the build'
 
 jobs:
 
@@ -78,7 +82,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-#          version: v2.0
+          #          version: v2.0
 
           args: --timeout=${{ inputs.lint-timeout }}
 
@@ -110,7 +114,7 @@ jobs:
         name: Install Firebase tools
         run: curl -sL firebase.tools | bash
 
-      - if: ${{ !inputs.code_coverage || github.ref != 'refs/heads/main' }}
+      - if: ${{ (!inputs.code_coverage || github.ref != 'refs/heads/main') && inputs.min_test_coverage_percent == '' }}
         run: go test ./...
         name: Run tests without coverage
         shell: bash
@@ -126,7 +130,7 @@ jobs:
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/${{ inputs.GOOGLE_APPLICATION_CREDENTIALS }}
 
-      - if: ${{ inputs.code_coverage && github.ref == 'refs/heads/main' }}
+      - if: ${{ (inputs.code_coverage && github.ref == 'refs/heads/main') || inputs.min_test_coverage_percent != '' }}
         name: Run tests with coverage
         run: go test -v -coverprofile=profile.cov ./...
         shell: bash
@@ -151,6 +155,14 @@ jobs:
         with:
           github-token: ${{ secrets.gh_token }}
           path-to-profile: profile.cov
+
+      - if: ${{ inputs.min_test_coverage_percent != '' }}
+        name: Check test coverage
+        shell: bash
+        run: |
+          total_coverage=$(go tool cover -func=profile.cov | grep total | awk '{print $3}' | sed 's/%//')
+          echo "Total coverage: $total_coverage%"
+          awk -v t=$total_coverage -v m=${{ inputs.min_test_coverage_percent }} 'BEGIN { if (t < m) { print "Coverage " t "% is below required " m "%"; exit 1 } }'
 
       # LSIF is not supported by SourceGraph anymore :(
       # - name: Generate LSIF data
