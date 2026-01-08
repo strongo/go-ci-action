@@ -112,7 +112,8 @@ jobs:
 
       - if: ${{ inputs.install-firebase-tools }}
         name: Install Firebase tools
-        run: curl -sL firebase.tools | bash
+        run: npm install -g firebase-tools
+        # run: curl -sL firebase.tools | bash
 
       - if: ${{ (!inputs.code_coverage || github.ref != 'refs/heads/main') && inputs.min_test_coverage_percent == '' }}
         run: go test ./...
