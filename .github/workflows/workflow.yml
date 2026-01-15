@@ -133,7 +133,8 @@ jobs:
 
       - if: ${{ (inputs.code_coverage && github.ref == 'refs/heads/main') || inputs.min_test_coverage_percent != '' }}
         name: Run tests with coverage
-        run: go test -v -coverprofile=profile.cov ./...
+        #        run: go test -v -coverprofile=profile.cov ./...
+        run: go test ./... -coverprofile=profile.cov -count=1
         shell: bash
         env:
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
