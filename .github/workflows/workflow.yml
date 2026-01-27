@@ -133,22 +133,11 @@ jobs:
 
       - if: ${{ (inputs.code_coverage && github.ref == 'refs/heads/main') || inputs.min_test_coverage_percent != '' }}
         name: Run tests with coverage
-        #        run: go test -v -coverprofile=profile.cov ./...
         run: go test ./... -coverprofile=profile.cov -count=1
         shell: bash
         env:
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/${{ inputs.GOOGLE_APPLICATION_CREDENTIALS }}
-
-      # - if: ${{ inputs.code_coverage && github.ref == 'refs/heads/main' }}
-      #   name: Send test coverage to Coveralls
-      #   uses: coverallsapp/github-action@v2
-      #   env:
-      #     COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
-      #   with:
-      #     github_token: ${{ secrets.gh_token }}
-      #     COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
-      #     path-to-profile: profile.cov
 
       - if: ${{ inputs.code_coverage && github.ref == 'refs/heads/main' }}
         uses: shogo82148/actions-goveralls@v1
