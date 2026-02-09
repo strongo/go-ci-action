@@ -45,6 +45,11 @@ on:
         type: number
         required: false
         description: 'Minimum test coverage percentage required to pass the build'
+      run-goreleaser:
+        type: boolean
+        description: 'Run GoReleaser'
+        required: false
+        default: false
 
 jobs:
 
@@ -174,5 +179,11 @@ jobs:
         with:
           github_token: ${{ secrets.gh_token }}
           default_bump: false
-          push: true
 
+      - if: ${{ inputs.run-goreleaser && !inputs.disable-version-bumping && github.ref == 'refs/heads/main' }}
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: v2
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
