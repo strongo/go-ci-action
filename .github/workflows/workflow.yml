@@ -181,6 +181,10 @@ jobs:
           default_bump: false
 
       - if: ${{ inputs.run-goreleaser && !inputs.disable-version-bumping && github.ref == 'refs/heads/main' }}
+        name: Fetch all tags
+        run: git fetch --tags
+  
+      - if: ${{ inputs.run-goreleaser && !inputs.disable-version-bumping && github.ref == 'refs/heads/main' }}
         uses: goreleaser/goreleaser-action@v6
         with:
           version: v2
