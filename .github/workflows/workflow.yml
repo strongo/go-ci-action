@@ -149,7 +149,7 @@ jobs:
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         with:
-          github-token: ${{ secrets.gh_token }}
+          github-token: ${{ secrets.GH_TOKEN }}
           path-to-profile: profile.cov
 
       - if: ${{ inputs.min_test_coverage_percent != '' }}
@@ -169,7 +169,7 @@ jobs:
       # - name: Upload LSIF data
       #   uses: sourcegraph/lsif-upload-action@master
       #   with:
-      #     github_token: ${{ secrets.gh_token }}
+      #     github_token: ${{ secrets.GH_TOKEN }}
 
       - if: ${{ !inputs.disable-version-bumping && github.ref == 'refs/heads/main' }}
         id: tag_version
@@ -177,7 +177,7 @@ jobs:
         uses: mathieudutour/github-tag-action@v6.2
 
         with:
-          github_token: ${{ secrets.gh_token }}
+          github_token: ${{ secrets.GH_TOKEN }}
           default_bump: false
 
       - if: ${{ inputs.run-goreleaser && !inputs.disable-version-bumping && github.ref == 'refs/heads/main' }}
