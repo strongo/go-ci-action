@@ -53,11 +53,9 @@ on:
 
 jobs:
 
-  go_ci:
-    name: StronGO job
+  go_lint:
+    name: Lint
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - name: Checkout code
@@ -66,21 +64,12 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v6
         with:
-          # cache: false
-          # go-version: '1.23.2'
           go-version: '1.26'
-
-      - name: Set GitHub access token for GOPRIVATE
-        if: ${{ inputs.GOPRIVATE }}
-        run: git config --global url."https://${{ secrets.GH_TOKEN }}:x-oauth-basic@github.com/sneat-co".insteadOf "https://github.com/sneat-co"
 
       - run: go get ./...
         shell: bash
         env:
           GOPRIVATE: ${{ inputs.GOPRIVATE }}
-
-      - run: go build ./...
-        shell: bash
 
       - run: go vet ./...
         shell: bash
@@ -107,6 +96,21 @@ jobs:
 
           # Optional: if set to true then the action don't cache or restore ~/.cache/go-build.
           # skip-build-cache: true
+
+  go_test:
+    name: Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'
 
       - if: ${{ inputs.install-firebase-tools }}
         name: Set up Java JRE 24
@@ -164,13 +168,46 @@ jobs:
       - if: ${{ inputs.min_test_coverage_percent != '' }}
         run: go tool cover -func=profile.cov | tail -n 1
 
-      # LSIF is not supported by SourceGraph anymore :(
-      # - name: Generate LSIF data
-      #   uses: sourcegraph/lsif-go-action@master
-      # - name: Upload LSIF data
-      #   uses: sourcegraph/lsif-upload-action@master
-      #   with:
-      #     github_token: ${{ secrets.GH_TOKEN }}
+  go_build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'
+
+      - name: Set GitHub access token for GOPRIVATE
+        if: ${{ inputs.GOPRIVATE }}
+        run: git config --global url."https://${{ secrets.GH_TOKEN }}:x-oauth-basic@github.com/sneat-co".insteadOf "https://github.com/sneat-co"
+
+      - run: go get ./...
+        shell: bash
+        env:
+          GOPRIVATE: ${{ inputs.GOPRIVATE }}
+
+      - run: go build ./...
+        shell: bash
+
+  go_bump:
+    name: Bump version & Release
+    runs-on: ubuntu-latest
+    needs: [ go_build, go_lint, go_test ]
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'
 
       - if: ${{ !inputs.disable-version-bumping && github.ref == 'refs/heads/main' }}
         id: tag_version
