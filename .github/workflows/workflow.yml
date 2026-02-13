@@ -54,7 +54,7 @@ on:
 jobs:
 
   go_ci:
-    name: StronGO CI
+    name: StronGO job
     runs-on: ubuntu-latest
     permissions:
       contents: write
