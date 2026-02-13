@@ -15,8 +15,13 @@ jobs:
     steps:
       # 1. Checkout the code
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # fetch full history
+          tags: true       # fetch all tags
 
-      - run: git fetch --tags
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'   # adjust to your project Go version
 
       - name: Bump version and push tag
         uses: mathieudutour/github-tag-action@v6.2
@@ -24,10 +29,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           default_bump: false
 
-      # 2. Setup Go
-      - uses: actions/setup-go@v6
-        with:
-          go-version: '1.26'   # adjust to your project Go version
+      - run: git fetch --tags
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
