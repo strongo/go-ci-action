@@ -18,6 +18,9 @@ jobs:
 
       - run: git fetch --tags
 
+      - name: Bump version and push tag
+        uses: mathieudutour/github-tag-action@v6.2
+
       # 2. Setup Go
       - uses: actions/setup-go@v6
         with:
