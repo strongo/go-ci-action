@@ -1,0 +1,29 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'   # triggers only on tags like v1.26.0
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # required for GoReleaser to push GitHub releases
+
+    steps:
+      # 1. Checkout the code
+      - uses: actions/checkout@v6
+
+      # 2. Setup Go
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'   # adjust to your project Go version
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # required for releases
