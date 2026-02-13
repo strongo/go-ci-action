@@ -16,6 +16,8 @@ jobs:
       # 1. Checkout the code
       - uses: actions/checkout@v6
 
+      - run: git fetch --tags
+
       # 2. Setup Go
       - uses: actions/setup-go@v6
         with:
