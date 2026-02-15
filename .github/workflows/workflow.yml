@@ -195,6 +195,7 @@ jobs:
 
   go_bump:
     name: Bump version & Release
+    if: ${{ !inputs.disable-version-bumping && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     needs: [ go_build, go_lint, go_test ]
     permissions:
@@ -204,7 +205,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - if: ${{ !inputs.disable-version-bumping && github.ref == 'refs/heads/main' }}
+      - if: ${{ github.ref == 'refs/heads/main' }}
+        name: Fetch all tags
+        run: git fetch --tags
+
+      - if: ${{ github.ref == 'refs/heads/main' }}
         id: tag_version
         name: Bump version and push tag
         uses: mathieudutour/github-tag-action@v6.2
