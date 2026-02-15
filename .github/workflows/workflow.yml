@@ -211,8 +211,7 @@ jobs:
         uses: mathieudutour/github-tag-action@v6.2
         with:
           github_token: ${{ secrets.GH_TOKEN }}
-          default_bump: false
-          fetch_all_tags: true
+          # fetch_all_tags: true - By default, this action fetch the last 100 tags from Github.
 
 
   go_release:
