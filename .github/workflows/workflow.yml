@@ -204,10 +204,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-
-      - if: ${{ github.ref == 'refs/heads/main' }}
-        name: Fetch all tags
-        run: git fetch --tags
+        with:
+          fetch-depth: 0
 
       - if: ${{ github.ref == 'refs/heads/main' }}
         id: tag_version
@@ -229,10 +227,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-
-      - if: ${{ inputs.run-goreleaser && !inputs.disable-version-bumping && github.ref == 'refs/heads/main' }}
-        name: Fetch all tags
-        run: git fetch --tags
+        with:
+          fetch-depth: 0
 
       - name: Install Go
         uses: actions/setup-go@v6
