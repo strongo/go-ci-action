@@ -239,6 +239,6 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           version: v2
-          args: release --clean
+          args: release --clean --config .github/goreleaser.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
