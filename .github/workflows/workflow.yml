@@ -236,7 +236,7 @@ jobs:
           go-version: '1.26'
 
       - if: ${{ inputs.run-goreleaser && !inputs.disable-version-bumping && github.ref == 'refs/heads/main' }}
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           version: v2
           args: release --clean --config .github/goreleaser.yaml
