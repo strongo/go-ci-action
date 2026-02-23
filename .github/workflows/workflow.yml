@@ -196,7 +196,7 @@ jobs:
         shell: bash
 
   go_bump:
-    name: Bump version & Release
+    name: Bump version
     if: ${{ !inputs.disable-version-bumping && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     needs: [ go_build, go_lint, go_test ]
