@@ -216,29 +216,29 @@ jobs:
           # fetch_all_tags: true - By default, this action fetch the last 100 tags from Github.
 
 
-  go_release:
-    name: GoReleaser
-    if: ${{ inputs.run-goreleaser && !inputs.disable-version-bumping }}
-    runs-on: ubuntu-latest
-    needs: [ go_bump ]
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Install Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: '1.26'
-
-      - if: ${{ inputs.run-goreleaser && !inputs.disable-version-bumping && github.ref == 'refs/heads/main' }}
-        uses: goreleaser/goreleaser-action@v7
-        with:
-          version: v2
-          args: release --clean --config .github/goreleaser.yaml
-        env:
-          GITHUB_TOKEN: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
+#  go_release:
+#    name: GoReleaser
+#    if: ${{ inputs.run-goreleaser && !inputs.disable-version-bumping }}
+#    runs-on: ubuntu-latest
+#    needs: [ go_bump ]
+#    permissions:
+#      contents: write
+#
+#    steps:
+#      - name: Checkout code
+#        uses: actions/checkout@v6
+#        with:
+#          fetch-depth: 0
+#
+#      - name: Install Go
+#        uses: actions/setup-go@v6
+#        with:
+#          go-version: '1.26'
+#
+#      - if: ${{ inputs.run-goreleaser && !inputs.disable-version-bumping && github.ref == 'refs/heads/main' }}
+#        uses: goreleaser/goreleaser-action@v7
+#        with:
+#          version: v2
+#          args: release --clean --config .github/goreleaser.yaml
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
