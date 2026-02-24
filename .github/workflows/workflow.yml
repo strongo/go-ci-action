@@ -152,7 +152,9 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/${{ inputs.GOOGLE_APPLICATION_CREDENTIALS }}
 
       - if: ${{ inputs.code_coverage && github.ref == 'refs/heads/main' }}
+        name: Upload coverage to Coveralls
         uses: shogo82148/actions-goveralls@v1
+        continue-on-error: true
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
         with:
