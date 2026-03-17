@@ -123,6 +123,12 @@ jobs:
           distribution: 'temurin'
 
       - if: ${{ inputs.install-firebase-tools }}
+        name: Set up Node.js LTS
+        uses: actions/setup-node@v6
+        with:
+          node-version: 'lts/*'
+
+      - if: ${{ inputs.install-firebase-tools }}
         name: Install Firebase tools
         run: npm install -g firebase-tools
         # run: curl -sL firebase.tools | bash
