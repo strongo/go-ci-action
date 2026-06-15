@@ -62,12 +62,25 @@ on:
         description: 'Prefix for version tags, e.g. "ingitdb/v" for a subdirectory module. Defaults to "v".'
         required: false
         default: 'v'
+      working_directory:
+        type: string
+        description: 'Working directory for all go commands. Useful for repos where the Go module lives in a subdirectory. Defaults to repo root.'
+        required: false
+        default: '.'
+      allow_major_version_bump:
+        type: boolean
+        description: 'Allow automatic major version bump when a commit message contains the major string token. Disabled by default to prevent accidental major bumps.'
+        required: false
+        default: false
 
 jobs:
 
   go_lint:
     name: Lint
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
     env:
       CGO_ENABLED: ${{ inputs.cgo_enabled && '1' || '0' }}
 
@@ -96,7 +109,7 @@ jobs:
           args: --timeout=${{ inputs.lint-timeout }}
 
           # Optional: working directory, useful for monorepos
-          # working-directory: some_dir
+          working-directory: ${{ inputs.working_directory }}
 
           # Optional: golangci-lint command line arguments.
           # args: --issues-exit-code=0
@@ -116,6 +129,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
     env:
       CGO_ENABLED: ${{ inputs.cgo_enabled && '1' || '0' }}
 
@@ -195,6 +211,9 @@ jobs:
   go_build:
     name: Build
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
     env:
       CGO_ENABLED: ${{ inputs.cgo_enabled && '1' || '0' }}
 
@@ -238,6 +257,7 @@ jobs:
         with:
           github_token: ${{ secrets.GH_TOKEN }}
           tag_prefix: ${{ inputs.tag_prefix }}
+          major_string_token: ${{ inputs.allow_major_version_bump && '#major' || '##no-major-bumps##' }}
           # fetch_all_tags: true - By default, this action fetch the last 100 tags from Github.
 
 
