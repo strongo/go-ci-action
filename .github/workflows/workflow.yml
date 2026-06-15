@@ -57,6 +57,11 @@ on:
         description: 'Build and test with cgo (sets CGO_ENABLED=1). Defaults to false (CGO_ENABLED=0) for pure-Go, statically-linked, cross-compilable builds.'
         required: false
         default: false
+      tag_prefix:
+        type: string
+        description: 'Prefix for version tags, e.g. "ingitdb/v" for a subdirectory module. Defaults to "v".'
+        required: false
+        default: 'v'
 
 jobs:
 
@@ -232,6 +237,7 @@ jobs:
         uses: mathieudutour/github-tag-action@v6.2
         with:
           github_token: ${{ secrets.GH_TOKEN }}
+          tag_prefix: ${{ inputs.tag_prefix }}
           # fetch_all_tags: true - By default, this action fetch the last 100 tags from Github.
 
 
