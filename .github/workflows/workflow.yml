@@ -52,12 +52,19 @@ on:
         description: 'Run GoReleaser'
         required: false
         default: false
+      cgo_enabled:
+        type: boolean
+        description: 'Build and test with cgo (sets CGO_ENABLED=1). Defaults to false (CGO_ENABLED=0) for pure-Go, statically-linked, cross-compilable builds.'
+        required: false
+        default: false
 
 jobs:
 
   go_lint:
     name: Lint
     runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: ${{ inputs.cgo_enabled && '1' || '0' }}
 
     steps:
       - name: Checkout code
@@ -104,6 +111,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      CGO_ENABLED: ${{ inputs.cgo_enabled && '1' || '0' }}
 
     steps:
       - name: Checkout code
@@ -181,6 +190,8 @@ jobs:
   go_build:
     name: Build
     runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: ${{ inputs.cgo_enabled && '1' || '0' }}
 
     steps:
       - name: Checkout code

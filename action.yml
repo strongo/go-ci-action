@@ -9,8 +9,12 @@ inputs:
     description: 'GitHub secret token'
     required: true
   code_coverage:
-    description: set to `true` to run code coverage with Coveralls 
+    description: set to `true` to run code coverage with Coveralls
     required: false
+  cgo_enabled:
+    description: 'Build and test with cgo (sets CGO_ENABLED=1). Defaults to false (CGO_ENABLED=0) for pure-Go, statically-linked, cross-compilable builds.'
+    required: false
+    default: 'false'
 
 runs:
   using: "composite"
@@ -18,18 +22,28 @@ runs:
 
     - run: go get ./...
       shell: bash
+      env:
+        CGO_ENABLED: ${{ inputs.cgo_enabled == 'true' && '1' || '0' }}
 
     - run: go vet ./...
       shell: bash
+      env:
+        CGO_ENABLED: ${{ inputs.cgo_enabled == 'true' && '1' || '0' }}
 
     - run: go build ./...
       shell: bash
+      env:
+        CGO_ENABLED: ${{ inputs.cgo_enabled == 'true' && '1' || '0' }}
 
     - run: go test ./...
       shell: bash
+      env:
+        CGO_ENABLED: ${{ inputs.cgo_enabled == 'true' && '1' || '0' }}
 
     - name: Go lint
       uses: golangci/golangci-lint-action@v9
+      env:
+        CGO_ENABLED: ${{ inputs.cgo_enabled == 'true' && '1' || '0' }}
       with:
 #        version: v2.0
         args: --timeout=${{ inputs.lint-timeout }}
