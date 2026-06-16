@@ -19,6 +19,10 @@ inputs:
     description: 'Directory containing the Go module (go.mod). Useful for monorepos where the module is not at the repo root. Defaults to the repo root.'
     required: false
     default: '.'
+  push_tag:
+    description: 'On push to main, bump and push a SemVer git tag (via conventional commits). Set to false for repos that manage versioning elsewhere (e.g. Nx Release in a monorepo). Requires contents:write when enabled.'
+    required: false
+    default: 'true'
 
 runs:
   using: "composite"
@@ -76,7 +80,7 @@ runs:
         # Optional: if set to true then the action don't cache or restore ~/.cache/go-build.
         # skip-build-cache: true
 
-    - if: ${{ github.ref == 'refs/heads/main' }}
+    - if: ${{ github.ref == 'refs/heads/main' && inputs.push_tag == 'true' }}
       name: Bump version and push tag
       id: tag_version
       uses: mathieudutour/github-tag-action@v6.2
