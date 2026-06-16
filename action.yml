@@ -15,6 +15,10 @@ inputs:
     description: 'Build and test with cgo (sets CGO_ENABLED=1). Defaults to false (CGO_ENABLED=0) for pure-Go, statically-linked, cross-compilable builds.'
     required: false
     default: 'false'
+  working-directory:
+    description: 'Directory containing the Go module (go.mod). Useful for monorepos where the module is not at the repo root. Defaults to the repo root.'
+    required: false
+    default: '.'
 
 runs:
   using: "composite"
@@ -22,21 +26,25 @@ runs:
 
     - run: go get ./...
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       env:
         CGO_ENABLED: ${{ inputs.cgo_enabled == 'true' && '1' || '0' }}
 
     - run: go vet ./...
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       env:
         CGO_ENABLED: ${{ inputs.cgo_enabled == 'true' && '1' || '0' }}
 
     - run: go build ./...
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       env:
         CGO_ENABLED: ${{ inputs.cgo_enabled == 'true' && '1' || '0' }}
 
     - run: go test ./...
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       env:
         CGO_ENABLED: ${{ inputs.cgo_enabled == 'true' && '1' || '0' }}
 
@@ -47,6 +55,7 @@ runs:
       with:
 #        version: v2.0
         args: --timeout=${{ inputs.lint-timeout }}
+        working-directory: ${{ inputs.working-directory }}
 
         # Optional: working directory, useful for monorepos
         # working-directory: somedir
