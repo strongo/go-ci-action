@@ -39,6 +39,11 @@ on:
         description: 'List of private Go modules'
         required: false
         default: ''
+      goprivate_git_host:
+        type: string
+        description: 'URL prefix (host or host/org) authenticated with GH_TOKEN when fetching private Go modules. Defaults to github.com (host-wide); set to e.g. github.com/my-org to scope narrower.'
+        required: false
+        default: 'github.com'
       additional_go_test_path:
         type: string
         required: false
@@ -94,6 +99,10 @@ jobs:
           go-version: '1.26'
           cache-dependency-path: ${{ inputs.working_directory }}/go.sum
 
+      - name: Set GitHub access token for GOPRIVATE
+        if: ${{ inputs.GOPRIVATE }}
+        run: git config --global url."https://${{ secrets.GH_TOKEN }}:x-oauth-basic@${{ inputs.goprivate_git_host }}/".insteadOf "https://${{ inputs.goprivate_git_host }}/"
+
       - run: go get ./...
         shell: bash
         env:
@@ -145,6 +154,10 @@ jobs:
         with:
           go-version: '1.26'
           cache-dependency-path: ${{ inputs.working_directory }}/go.sum
+
+      - name: Set GitHub access token for GOPRIVATE
+        if: ${{ inputs.GOPRIVATE }}
+        run: git config --global url."https://${{ secrets.GH_TOKEN }}:x-oauth-basic@${{ inputs.goprivate_git_host }}/".insteadOf "https://${{ inputs.goprivate_git_host }}/"
 
       - if: ${{ inputs.install-firebase-tools }}
         name: Set up Java JRE 24
@@ -231,7 +244,7 @@ jobs:
 
       - name: Set GitHub access token for GOPRIVATE
         if: ${{ inputs.GOPRIVATE }}
-        run: git config --global url."https://${{ secrets.GH_TOKEN }}:x-oauth-basic@github.com/sneat-co".insteadOf "https://github.com/sneat-co"
+        run: git config --global url."https://${{ secrets.GH_TOKEN }}:x-oauth-basic@${{ inputs.goprivate_git_host }}/".insteadOf "https://${{ inputs.goprivate_git_host }}/"
 
       - run: go get ./...
         shell: bash
