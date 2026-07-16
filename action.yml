@@ -23,6 +23,16 @@ inputs:
     description: 'On push to main, bump and push a SemVer git tag (via conventional commits). Set to false for repos that manage versioning elsewhere (e.g. Nx Release in a monorepo). Requires contents:write when enabled.'
     required: false
     default: 'true'
+  default_bump:
+    description: >-
+      Bump level applied when no conventional commit since the last tag implies one.
+      "false" (default) cuts a tag only when the commits since the last tag contain
+      feat:/fix:/BREAKING messages; set to "patch"/"minor"/"major" to always bump on a
+      push to main. IMPORTANT: for tagging to see commits that sit BEHIND a merge commit,
+      the calling workflow MUST run actions/checkout with `fetch-depth: 0` (the default
+      shallow clone only exposes HEADs message). See the README.
+    required: false
+    default: 'false'
 
 runs:
   using: "composite"
@@ -86,7 +96,7 @@ runs:
       uses: mathieudutour/github-tag-action@v6.2
       with:
         github_token: ${{ inputs.github_token }}
-        default_bump: false
+        default_bump: ${{ inputs.default_bump }}
 
     - if: ${{ inputs.code_coverage }}
       name: Code coverage by Coveralls

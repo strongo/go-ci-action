@@ -1,0 +1,22 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Shared Renovate preset for repositories that consume strongo/cicd reusable workflows and the composite action. Extend it with `github>strongo/cicd` to (1) keep the strongo/cicd@vX ref current automatically and (2) migrate any legacy strongo/go-ci-action references onto strongo/cicd@v1 without a manual find-and-replace.",
+  "packageRules": [
+    {
+      "description": "Group and auto-update the strongo/cicd reusable-workflow / composite-action ref. This advances pinned @v1.x.y (and, when a consumer tracks it, follows the moving @v1) as new releases are cut. Each bump is a separate PR gated by the consumer's own CI, so a bad strongo/cicd release blocks that one repo instead of breaking every consumer at once - the firebreak that pinning @main lacks.",
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": ["strongo/cicd", "strongo/go-ci-action"],
+      "groupName": "strongo/cicd",
+      "automerge": true,
+      "automergeType": "pr",
+      "pinDigests": false
+    },
+    {
+      "description": "Automate the go-ci-action -> cicd rename: replace legacy strongo/go-ci-action references with strongo/cicd@v1. GitHub redirects keep the old path working at runtime, so this is a gradual, per-repo cleanup rather than a forced mass push.",
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": ["strongo/go-ci-action"],
+      "replacementName": "strongo/cicd",
+      "replacementVersion": "v1"
+    }
+  ]
+}

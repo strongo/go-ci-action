@@ -39,11 +39,12 @@ jobs:
       contents: write   # required for GoReleaser to push GitHub releases
 
     steps:
-      # 1. Checkout the code
+      # 1. Checkout the code with full history + all tags. Both GoReleaser (changelog /
+      #    "current tag" detection) and github-tag-action (deriving the next version from
+      #    commits since the last tag) fail or under-tag on the default shallow clone.
       - uses: actions/checkout@v7
-      #        with:
-      #          fetch-depth: 0  # fetch full history
-      #          tags: true       # fetch all tags
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-go@v7
         with:
