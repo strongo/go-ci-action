@@ -77,6 +77,16 @@ on:
         description: 'Allow automatic major version bump when a commit message contains the major string token. Disabled by default to prevent accidental major bumps.'
         required: false
         default: false
+      default_bump:
+        type: string
+        description: >-
+          Bump level applied when no conventional commit since the last tag implies one
+          (github-tag-action semantics). "patch" (the default, preserving prior behaviour)
+          cuts a patch release on every push/merge to main; set to "false" to only cut a
+          tag when the commits since the last tag contain feat:/fix:/BREAKING conventional
+          messages (no release for docs/chore/ci-only changes).
+        required: false
+        default: 'patch'
 
 jobs:
 
@@ -265,6 +275,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          # Full history + all tags are REQUIRED by github-tag-action: it derives the next
+          # version from every conventional commit SINCE THE LAST TAG. With the default
+          # shallow clone (fetch-depth: 1) the action only sees HEAD's message, so a
+          # "Merge pull request #N ..." merge commit produces no bump and no tag even when
+          # the merged branch contained feat:/fix: commits. fetch-depth: 0 fixes that by
+          # letting the action evaluate the whole lastTag..HEAD range. (fetch-depth: 0
+          # fetches all tags too, so the previous version is always found.)
+          fetch-depth: 0
 
       - if: ${{ github.ref == 'refs/heads/main' }}
         id: tag_version
@@ -273,6 +292,7 @@ jobs:
         with:
           github_token: ${{ secrets.GH_TOKEN }}
           tag_prefix: ${{ inputs.tag_prefix }}
+          default_bump: ${{ inputs.default_bump }}
           major_string_token: ${{ inputs.allow_major_version_bump && '#major' || '##no-major-bumps##' }}
           # fetch_all_tags: true - By default, this action fetch the last 100 tags from Github.
 
