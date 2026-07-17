@@ -303,7 +303,6 @@ jobs:
           github_token: ${{ secrets.GH_TOKEN }}
           tag_prefix: ${{ inputs.tag_prefix }}
           default_bump: ${{ inputs.default_bump }}
-          major_string_token: ${{ inputs.allow_major_version_bump && '#major' || '##no-major-bumps##' }}
           dry_run: true
 
       - if: ${{ github.ref == 'refs/heads/main' && steps.bump_dry.outputs.new_tag != '' }}
