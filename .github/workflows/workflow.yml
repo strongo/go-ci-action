@@ -284,17 +284,52 @@ jobs:
           # letting the action evaluate the whole lastTag..HEAD range. (fetch-depth: 0
           # fetches all tags too, so the previous version is always found.)
           fetch-depth: 0
+          # Persist GH_TOKEN so the guarded `git push` of the computed tag below
+          # is authenticated the same way the action's push used to be.
+          token: ${{ secrets.GH_TOKEN }}
 
+      # Bump is two steps: a dry run computes the version github-tag-action would
+      # pick from conventional commits, then a guard caps an accidental MAJOR
+      # bump to a minor (unless allow_major_version_bump) and pushes the final
+      # tag with git. This closes the hole where a `feat!:` / `BREAKING CHANGE:`
+      # commit would jump a pre-1.0 module v0 -> v1: the major_string_token
+      # sentinel only blocks the `#major` token path, NOT conventional breaking
+      # changes, which github-tag-action still bumps to a major.
       - if: ${{ github.ref == 'refs/heads/main' }}
-        id: tag_version
-        name: Bump version and push tag
+        id: bump_dry
+        name: Compute next version (dry run)
         uses: mathieudutour/github-tag-action@v6.2
         with:
           github_token: ${{ secrets.GH_TOKEN }}
           tag_prefix: ${{ inputs.tag_prefix }}
           default_bump: ${{ inputs.default_bump }}
           major_string_token: ${{ inputs.allow_major_version_bump && '#major' || '##no-major-bumps##' }}
-          # fetch_all_tags: true - By default, this action fetch the last 100 tags from Github.
+          dry_run: true
+
+      - if: ${{ github.ref == 'refs/heads/main' && steps.bump_dry.outputs.new_tag != '' }}
+        id: tag_version
+        name: Determine and push guarded tag
+        env:
+          PREV: ${{ steps.bump_dry.outputs.previous_version }}
+          NEXT: ${{ steps.bump_dry.outputs.new_version }}
+          NEXT_TAG: ${{ steps.bump_dry.outputs.new_tag }}
+          PREV_TAG: ${{ steps.bump_dry.outputs.previous_tag }}
+          ALLOW_MAJOR: ${{ inputs.allow_major_version_bump }}
+          PREFIX: ${{ inputs.tag_prefix }}
+        run: |
+          set -euo pipefail
+          prev_major="${PREV%%.*}"
+          next_major="${NEXT%%.*}"
+          tag="$NEXT_TAG"
+          if [ "$ALLOW_MAJOR" != "true" ] && [ -n "$PREV" ] && [ "$next_major" -gt "$prev_major" ]; then
+            prev_minor="$(printf '%s' "$PREV" | cut -d. -f2)"
+            capped="${prev_major}.$((prev_minor + 1)).0"
+            tag="${PREFIX}${capped}"
+            echo "::warning title=Major bump blocked::A breaking commit since ${PREV_TAG} would bump the MAJOR version (${PREV} -> ${NEXT}). Capping to ${capped} (pre-1.0 / disallowed-major semantics treat a breaking change as a minor bump). Set allow_major_version_bump: true to intend a real major."
+          fi
+          git tag "$tag"
+          git push origin "refs/tags/$tag"
+          echo "new_tag=$tag" >> "$GITHUB_OUTPUT"
 
 
 #  go_release:
