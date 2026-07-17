@@ -168,8 +168,24 @@ last tag** and pushes a new SemVer tag:
 | --- | --- |
 | `fix:` | patch bump (`v1.2.3 → v1.2.4`) |
 | `feat:` | minor bump (`v1.2.3 → v1.3.0`) |
-| `feat!:` / `BREAKING CHANGE:` | major bump — only if `allow_major_version_bump: true` |
+| `feat!:` / `BREAKING CHANGE:` | major **only if** `allow_major_version_bump: true`; otherwise **capped to a minor** bump (see guard below) |
 | docs/chore/ci/refactor only | `default_bump` decides (see below) |
+
+### Accidental-major guard (`allow_major_version_bump`)
+
+`github-tag-action` treats a `feat!:` / `BREAKING CHANGE:` commit as a **major**
+bump — and it does so **regardless** of the `major_string_token` sentinel, so
+setting that alone does **not** stop it. That is how a pre-1.0 repo silently
+jumped `v0.64.2 → v1.0.0` from a `feat(cli)!:` commit.
+
+Both the reusable `workflow.yml` (`go_bump`) and `release.yml` (CD bump path)
+now guard against this: they compute the proposed version in a **dry run**, and
+when `allow_major_version_bump` is `false` (the default) a bump that would raise
+the **major** version is **capped to a minor** bump of the previous version
+(`v0.64.2 → v0.65.0`; `v1.5.0 → v1.6.0`) with a `::warning::` in the log. Pre-1.0
+this is exactly right — a breaking change is a minor bump until you deliberately
+cut `v1.0.0`. To intend a real major, either set `allow_major_version_bump: true`
+or push an explicit `vX.0.0` tag (a tag push bypasses the bump entirely).
 
 ### Required repo settings (read this — it's why tags were being missed)
 

@@ -67,6 +67,36 @@ on:
           Extra arguments appended to `goreleaser release --clean`, e.g.
           `--skip=chocolatey,snapcraft` when those publishers run in a separate
           per-repo job (they need tooling/runners this ubuntu job lacks).
+      tag_prefix:
+        type: string
+        required: false
+        default: 'v'
+        description: >-
+          Prefix for version tags, e.g. "ingitdb/v" for a subdirectory module.
+          Defaults to "v". Used when the CD bump path (branch/merge trigger)
+          computes and pushes the next tag.
+      default_bump:
+        type: string
+        required: false
+        default: 'false'
+        description: >-
+          Bump level (github-tag-action semantics) applied on a CD run when NO
+          conventional commit since the last tag implies one. Default 'false':
+          docs/chore/ci-only merges cut no tag and publish nothing (GoReleaser is
+          skipped). Set 'patch' to release on every merge to main.
+      allow_major_version_bump:
+        type: boolean
+        required: false
+        default: false
+        description: >-
+          When false (default), a CD run (branch/merge trigger) whose commits
+          would bump the MAJOR version is CAPPED to a minor bump, and a warning
+          is logged. This is the guard against an accidental v0->v1 (or vN->vN+1)
+          jump from a `feat!:` / `BREAKING CHANGE:` commit — which
+          github-tag-action treats as a major bump regardless of any
+          major_string_token sentinel. Pre-1.0, a breaking change is a minor
+          bump; this preserves that. Set true only to intend a real major
+          release (or push an explicit vX.0.0 tag, which bypasses the bump).
     outputs:
       tag:
         description: >-
@@ -111,17 +141,57 @@ jobs:
       # so skip the bump and release that exact tag as-is. This lets callers keep
       # an explicit "push a vX.Y.Z tag to release" flow while still sharing this
       # workflow — no auto-bump can override the tag they chose.
-      - name: Bump version and push tag
-        id: tag
+      #
+      # The bump is two steps: a dry run computes the version github-tag-action
+      # would choose from conventional commits, then a guard caps an accidental
+      # MAJOR bump to a minor one (unless allow_major_version_bump) and pushes the
+      # final tag itself. We push with plain git (not the action) so the guard's
+      # decision is authoritative and the tag string is unambiguous.
+      - name: Compute next version (dry run)
+        id: bump_dry
         if: ${{ github.ref_type != 'tag' }}
         uses: mathieudutour/github-tag-action@v6.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          default_bump: false
+          tag_prefix: ${{ inputs.tag_prefix }}
+          default_bump: ${{ inputs.default_bump }}
+          dry_run: true
+
+      - name: Determine and push guarded tag
+        id: tag
+        if: ${{ github.ref_type != 'tag' && steps.bump_dry.outputs.new_tag != '' }}
+        env:
+          PREV: ${{ steps.bump_dry.outputs.previous_version }}
+          NEXT: ${{ steps.bump_dry.outputs.new_version }}
+          NEXT_TAG: ${{ steps.bump_dry.outputs.new_tag }}
+          PREV_TAG: ${{ steps.bump_dry.outputs.previous_tag }}
+          ALLOW_MAJOR: ${{ inputs.allow_major_version_bump }}
+          PREFIX: ${{ inputs.tag_prefix }}
+        run: |
+          set -euo pipefail
+          # previous_version / new_version are bare SemVer (no prefix).
+          prev_major="${PREV%%.*}"
+          next_major="${NEXT%%.*}"
+          tag="$NEXT_TAG"
+          if [ "$ALLOW_MAJOR" != "true" ] && [ -n "$PREV" ] && [ "$next_major" -gt "$prev_major" ]; then
+            prev_minor="$(printf '%s' "$PREV" | cut -d. -f2)"
+            capped="${prev_major}.$((prev_minor + 1)).0"
+            tag="${PREFIX}${capped}"
+            echo "::warning title=Major bump blocked::A breaking commit since ${PREV_TAG} would bump the MAJOR version (${PREV} -> ${NEXT}). Capping to ${capped} (pre-1.0 / disallowed-major semantics treat a breaking change as a minor bump). Set allow_major_version_bump: true, or push an explicit vX.0.0 tag, to intend a real major."
+          fi
+          git tag "$tag"
+          git push origin "refs/tags/$tag"
+          echo "new_tag=$tag" >> "$GITHUB_OUTPUT"
 
       - run: git fetch --tags
 
+      # Release the tag on HEAD: the exact tag on a tag-push, or the one the
+      # guarded bump just cut on a branch/merge. On a branch/merge with no
+      # bumping commit no tag was cut, so HEAD is untagged and there is nothing
+      # to release — skip GoReleaser (running it on an untagged commit would
+      # fail the job).
       - name: Run GoReleaser
+        if: ${{ github.ref_type == 'tag' || steps.tag.outputs.new_tag != '' }}
         uses: goreleaser/goreleaser-action@v7
         with:
           version: v2
