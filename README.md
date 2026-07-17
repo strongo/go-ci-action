@@ -93,6 +93,42 @@ macOS signing (`xcrun`/`codesign`) — cannot run here. Keep them as a small
 per-repo job (`needs:` this one) and add `--skip=chocolatey,snapcraft` via
 `goreleaser_extra_args` so this job doesn't try to run them.
 
+## Packaging conventions (apply to every product)
+
+These are ecosystem-wide `.goreleaser.yaml` standards so all our CLIs package
+and update identically. New repos MUST follow them; existing repos are migrated
+as they're touched.
+
+### Homebrew: cask, not formula
+
+Use `homebrew_casks:` — **not** the deprecated `brews:` — in `.goreleaser.yaml`.
+Decided 2026-07-17; applied to `ingitdb-cli` and `specscore-cli`.
+
+- **Why.** We ship prebuilt binaries, not source; casks are Homebrew's home for
+  prebuilt artifacts, and GoReleaser has deprecated `brews:` (it emits a warning
+  and will be removed). `goreleaser check` fails on `brews:` in current versions.
+- **Install command becomes** `brew install --cask <tap>/<name>` (the
+  tap-qualified form also resolves without `--cask`, so it's a soft change).
+- **Linux tradeoff — accepted.** Homebrew casks are macOS-only; Linux users
+  install via our `curl … | sh` script (or `go install`), not `brew`, so
+  dropping the Linux-brew path costs us nothing.
+- **Cask fidelity limits.** GoReleaser's cask schema has no `install`/`test`
+  hook, so a per-manifest `--version` smoke test can't be carried over. The tap
+  gains a `Casks/` tree; a leftover `Formula/<name>.rb` stops updating and can be
+  pruned once.
+- **Self-update gotcha.** If the CLI has a self-update path that detects
+  Homebrew installs, it MUST treat `/Caskroom/` as Homebrew-managed: Apple
+  Silicon casks live under `/opt/homebrew/Caskroom/…` but Intel casks under
+  `/usr/local/Caskroom/…`, which matches no other Homebrew marker.
+
+### macOS notarization: opt-in, dormant by default
+
+Ship unsigned macOS binaries by default. Wire notarization as a `notarize.macos`
+block whose `enabled` is gated on the signing secret
+(`{{ isEnvSet "MACOS_SIGN_P12" }}`), so with the secret unset it is skipped and
+can never break a release. Enabling it is a deliberate per-repo step: verify the
+Apple credentials, then forward `MACOS_SIGN_*` / `NOTARIZE_*` into this workflow.
+
 ## Keep the pin fresh with Renovate
 
 Add the shared preset to a consumer repo's `renovate.json` so Renovate keeps the
