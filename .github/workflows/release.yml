@@ -10,6 +10,30 @@ on:
           username slot so GOPRIVATE fetches (e.g. GoReleaser's `go mod tidy`
           before-hook) can pull private dependencies. Only needed when GOPRIVATE
           is set; omit for repos with only public dependencies.
+      GORELEASER_GITHUB_TOKEN:
+        required: false
+        description: >-
+          Cross-repo PAT forwarded to GoReleaser as $GORELEASER_GITHUB_TOKEN.
+          Used by publishers that push to OTHER repos the default GITHUB_TOKEN
+          cannot reach — Homebrew tap/cask, Scoop bucket, and (unless a separate
+          WINGET_GITHUB_TOKEN is given) the WinGet fork. Reference it in your
+          `.goreleaser.yaml` as `{{ .Env.GORELEASER_GITHUB_TOKEN }}`. Omit for
+          repos whose only "publisher" is the GitHub release itself.
+      WINGET_GITHUB_TOKEN:
+        required: false
+        description: >-
+          Optional PAT forwarded to GoReleaser as $WINGET_GITHUB_TOKEN, for the
+          WinGet publisher's cross-fork PR to microsoft/winget-pkgs (needs a
+          classic PAT with `public_repo`). Provide only if it must differ from
+          GORELEASER_GITHUB_TOKEN; otherwise reference GORELEASER_GITHUB_TOKEN in
+          the winget block instead.
+      AUR_SSH_PRIVATE_KEY:
+        required: false
+        description: >-
+          Optional AUR SSH private key, forwarded to GoReleaser as
+          $AUR_SSH_PRIVATE_KEY. GoReleaser's `aurs` publisher accepts the key
+          contents directly (`private_key: {{ .Env.AUR_SSH_PRIVATE_KEY }}`); the
+          key must not be password-protected.
     inputs:
       GOPRIVATE:
         type: string
@@ -27,6 +51,29 @@ on:
           URL prefix (host or host/org) authenticated with GH_TOKEN when fetching
           private Go modules. Defaults to github.com; set e.g. github.com/my-org
           to scope the token URL-rewrite narrower.
+      go_version:
+        type: string
+        required: false
+        default: '1.26'
+        description: >-
+          Go toolchain version for setup-go. Defaults to '1.26'. Set to match
+          your module's go.mod (e.g. '1.26.5') when a build/release needs a
+          specific patch release.
+      goreleaser_extra_args:
+        type: string
+        required: false
+        default: ''
+        description: >-
+          Extra arguments appended to `goreleaser release --clean`, e.g.
+          `--skip=chocolatey,snapcraft` when those publishers run in a separate
+          per-repo job (they need tooling/runners this ubuntu job lacks).
+    outputs:
+      tag:
+        description: >-
+          The tag github-tag-action created this run, or empty when no tag was
+          cut (no bumping commits) or the run was already on a tag. Consumers can
+          chain per-repo publisher jobs on `needs.<job>.outputs.tag`.
+        value: ${{ jobs.release.outputs.tag }}
 #  push:
 #    tags:
 #      - 'v*.*.*'   # triggers only on tags like v1.26.0
@@ -37,6 +84,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write   # required for GoReleaser to push GitHub releases
+    outputs:
+      tag: ${{ steps.tag.outputs.new_tag }}
 
     steps:
       # 1. Checkout the code with full history + all tags. Both GoReleaser (changelog /
@@ -48,7 +97,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: '1.26'   # adjust to your project Go version
+          go-version: ${{ inputs.go_version }}
 
       # Authenticate private-module fetches (GoReleaser's `go mod tidy` hook runs
       # BEFORE the build and will fail to reach private deps otherwise). No-op for
@@ -57,7 +106,14 @@ jobs:
         if: ${{ inputs.GOPRIVATE }}
         run: git config --global url."https://${{ secrets.GH_TOKEN }}:x-oauth-basic@${{ inputs.goprivate_git_host }}/".insteadOf "https://${{ inputs.goprivate_git_host }}/"
 
+      # Auto-bump only when the caller triggered on a branch push/merge. On a tag
+      # push (github.ref_type == 'tag') the version is already fixed by the tag,
+      # so skip the bump and release that exact tag as-is. This lets callers keep
+      # an explicit "push a vX.Y.Z tag to release" flow while still sharing this
+      # workflow — no auto-bump can override the tag they chose.
       - name: Bump version and push tag
+        id: tag
+        if: ${{ github.ref_type != 'tag' }}
         uses: mathieudutour/github-tag-action@v6.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -69,7 +125,12 @@ jobs:
         uses: goreleaser/goreleaser-action@v7
         with:
           version: v2
-          args: release --clean
+          args: release --clean ${{ inputs.goreleaser_extra_args }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # required for releases
           GOPRIVATE: ${{ inputs.GOPRIVATE }}
+          # Optional cross-repo publisher credentials. Empty when the caller
+          # doesn't pass them; GoReleaser only reads the ones its config uses.
+          GORELEASER_GITHUB_TOKEN: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
+          WINGET_GITHUB_TOKEN: ${{ secrets.WINGET_GITHUB_TOKEN }}
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}

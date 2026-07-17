@@ -49,6 +49,50 @@ discouraged for the reasons above.
 > Existing `@main` consumers are **not** being mass-migrated. Adopt `@v1` (or the
 > Renovate preset) gradually, per repo, on your own schedule.
 
+## Releasing with `release.yml`
+
+`release.yml` runs the GoReleaser flow: checkout (full history) → setup-go →
+optional auto-tag → `goreleaser release --clean` against **your repo's own**
+`.goreleaser.yaml`. Two trigger styles are supported:
+
+- **Push to `main`** — `github-tag-action` bumps from conventional commits and
+  releases the new tag (continuous delivery).
+- **Push a `vX.Y.Z` tag** — the auto-bump step is skipped (the tag already fixes
+  the version) and GoReleaser releases that exact tag. Use this for an explicit,
+  human-gated "cut a release by pushing a tag" flow.
+
+Publishers that push to **other** repos (Homebrew, Scoop, WinGet, AUR) need
+credentials the default `GITHUB_TOKEN` can't provide. Pass them as optional
+secrets; GoReleaser reads only the ones your config references:
+
+```yaml
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    uses: strongo/cicd/.github/workflows/release.yml@v1
+    with:
+      go_version: '1.26.5'                 # optional; defaults to '1.26'
+      # goreleaser_extra_args: '--skip=chocolatey,snapcraft'  # optional
+    secrets:
+      GORELEASER_GITHUB_TOKEN: ${{ secrets.MY_GORELEASER_PAT }}   # brew/scoop/winget
+      WINGET_GITHUB_TOKEN:     ${{ secrets.WINGET_GITHUB_TOKEN }}  # optional, if separate
+      AUR_SSH_PRIVATE_KEY:     ${{ secrets.AUR_SSH_PRIVATE_KEY }}  # optional
+```
+
+Reference the forwarded credentials in `.goreleaser.yaml` as
+`{{ .Env.GORELEASER_GITHUB_TOKEN }}`, `{{ .Env.WINGET_GITHUB_TOKEN }}`, and
+`{{ .Env.AUR_SSH_PRIVATE_KEY }}`.
+
+Publishers that need a **different runner or extra tooling** this ubuntu job
+lacks — Chocolatey (`choco`, Windows-only), Snapcraft (`snapcraft`), or native
+macOS signing (`xcrun`/`codesign`) — cannot run here. Keep them as a small
+per-repo job (`needs:` this one) and add `--skip=chocolatey,snapcraft` via
+`goreleaser_extra_args` so this job doesn't try to run them.
+
 ## Keep the pin fresh with Renovate
 
 Add the shared preset to a consumer repo's `renovate.json` so Renovate keeps the
