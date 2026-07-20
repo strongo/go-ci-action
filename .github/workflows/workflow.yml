@@ -144,7 +144,8 @@ jobs:
         if: ${{ inputs.GOPRIVATE }}
         run: git config --global url."https://${{ secrets.GH_TOKEN }}:x-oauth-basic@${{ inputs.goprivate_git_host }}/".insteadOf "https://${{ inputs.goprivate_git_host }}/"
 
-      - run: go get ./...
+      - name: Download dependencies
+        run: go mod download all
         shell: bash
         env:
           GOPRIVATE: ${{ inputs.GOPRIVATE }}
@@ -199,6 +200,12 @@ jobs:
       - name: Set GitHub access token for GOPRIVATE
         if: ${{ inputs.GOPRIVATE }}
         run: git config --global url."https://${{ secrets.GH_TOKEN }}:x-oauth-basic@${{ inputs.goprivate_git_host }}/".insteadOf "https://${{ inputs.goprivate_git_host }}/"
+
+      - name: Download test dependencies
+        run: go mod download all
+        shell: bash
+        env:
+          GOPRIVATE: ${{ inputs.GOPRIVATE }}
 
       - if: ${{ inputs.install-firebase-tools }}
         name: Set up Java JRE 24
@@ -287,7 +294,8 @@ jobs:
         if: ${{ inputs.GOPRIVATE }}
         run: git config --global url."https://${{ secrets.GH_TOKEN }}:x-oauth-basic@${{ inputs.goprivate_git_host }}/".insteadOf "https://${{ inputs.goprivate_git_host }}/"
 
-      - run: go get ./...
+      - name: Download dependencies
+        run: go mod download all
         shell: bash
         env:
           GOPRIVATE: ${{ inputs.GOPRIVATE }}
