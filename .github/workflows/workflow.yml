@@ -176,8 +176,8 @@ jobs:
           # Optional: if set to true then the action don't cache or restore ~/.cache/go-build.
           # skip-build-cache: true
 
-  go_test:
-    name: Test
+  go_test_build:
+    name: Build & test
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -201,11 +201,17 @@ jobs:
         if: ${{ inputs.GOPRIVATE }}
         run: git config --global url."https://${{ secrets.GH_TOKEN }}:x-oauth-basic@${{ inputs.goprivate_git_host }}/".insteadOf "https://${{ inputs.goprivate_git_host }}/"
 
-      - name: Download test dependencies
+      - name: Download dependencies
         run: go mod download all
         shell: bash
         env:
           GOPRIVATE: ${{ inputs.GOPRIVATE }}
+
+      # Build first so a compilation failure is reported before any optional
+      # test runtime setup. Tests then use the same runner and Go build cache.
+      - name: Build
+        run: ${{ inputs.build_command }}
+        shell: bash
 
       - if: ${{ inputs.install-firebase-tools }}
         name: Set up Java JRE 24
@@ -271,39 +277,8 @@ jobs:
       - if: ${{ inputs.min_test_coverage_percent != '' }}
         run: go tool cover -func=profile.cov | tail -n 1
 
-  go_build:
-    name: Build
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ${{ inputs.working_directory }}
-    env:
-      CGO_ENABLED: ${{ inputs.cgo_enabled && '1' || '0' }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Install Go
-        uses: actions/setup-go@v7
-        with:
-          go-version: '1.26'
-          cache-dependency-path: ${{ inputs.working_directory }}/go.sum
-
-      - name: Set GitHub access token for GOPRIVATE
-        if: ${{ inputs.GOPRIVATE }}
-        run: git config --global url."https://${{ secrets.GH_TOKEN }}:x-oauth-basic@${{ inputs.goprivate_git_host }}/".insteadOf "https://${{ inputs.goprivate_git_host }}/"
-
-      - name: Download dependencies
-        run: go mod download all
-        shell: bash
-        env:
-          GOPRIVATE: ${{ inputs.GOPRIVATE }}
-
-      - name: Build
-        run: ${{ inputs.build_command }}
-        shell: bash
-
+      # Upload only a build that compiled and whose tests (including any
+      # configured coverage gate) passed.
       - name: Upload build artifact
         if: ${{ inputs.artifact_name != '' && inputs.artifact_path != '' && (!inputs.artifact_on_main_only || github.ref == 'refs/heads/main') }}
         uses: actions/upload-artifact@v7
@@ -318,7 +293,7 @@ jobs:
     name: Bump version
     if: ${{ !inputs.disable-version-bumping && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
-    needs: [ go_build, go_lint, go_test ]
+    needs: [ go_test_build, go_lint ]
     permissions:
       contents: write
 
