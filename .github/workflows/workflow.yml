@@ -81,7 +81,7 @@ on:
         type: string
         description: >-
           Bump level applied when no conventional commit since the last tag implies one
-          (github-tag-action semantics). "patch" (the default, preserving prior behaviour)
+          (conventional-commit bump semantics). "patch" (the default, preserving prior behaviour)
           cuts a patch release on every push/merge to main; set to "false" to only cut a
           tag when the commits since the last tag contain feat:/fix:/BREAKING conventional
           messages (no release for docs/chore/ci-only changes).
@@ -228,7 +228,7 @@ jobs:
         run: |
           total_coverage=$(go tool cover -func=profile.cov | grep total | awk '{print $3}' | sed 's/%//')
           echo "Total coverage: $total_coverage%"
-          awk -v t=$total_coverage -v m=${{ inputs.min_test_coverage_percent }} 'BEGIN { if (t < m) { print "Coverage " t "% is below required " m "%"; exit 1 } }'
+          awk -v t="$total_coverage" -v m="${{ inputs.min_test_coverage_percent }}" 'BEGIN { if (t < m) { print "Coverage " t "% is below required " m "%"; exit 1 } }'
 
       - if: ${{ inputs.min_test_coverage_percent != '' }}
         run: go tool cover -func=profile.cov | tail -n 1
@@ -276,43 +276,83 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
-          # Full history + all tags are REQUIRED by github-tag-action: it derives the next
+          # Full history + all tags are REQUIRED by the conventional-commit bump step: it derives the next
           # version from every conventional commit SINCE THE LAST TAG. With the default
-          # shallow clone (fetch-depth: 1) the action only sees HEAD's message, so a
+          # shallow clone (fetch-depth: 1) the step only sees HEAD's message, so a
           # "Merge pull request #N ..." merge commit produces no bump and no tag even when
           # the merged branch contained feat:/fix: commits. fetch-depth: 0 fixes that by
-          # letting the action evaluate the whole lastTag..HEAD range. (fetch-depth: 0
+          # letting the step evaluate the whole lastTag..HEAD range. (fetch-depth: 0
           # fetches all tags too, so the previous version is always found.)
           fetch-depth: 0
           # Persist GH_TOKEN so the guarded `git push` of the computed tag below
           # is authenticated the same way the action's push used to be.
           token: ${{ secrets.GH_TOKEN }}
 
-      # Bump is two steps: a dry run computes the version github-tag-action would
-      # pick from conventional commits, then a guard caps an accidental MAJOR
+      # Bump is two steps: a dry run computes the next version from conventional commits,
+      # then a guard caps an accidental MAJOR
       # bump to a minor (unless allow_major_version_bump) and pushes the final
       # tag with git. This closes the hole where a `feat!:` / `BREAKING CHANGE:`
       # commit would jump a pre-1.0 module v0 -> v1: the major_string_token
       # sentinel only blocks the `#major` token path, NOT conventional breaking
-      # changes, which github-tag-action still bumps to a major.
+      # changes, which would otherwise bump to a major.
       - if: ${{ github.ref == 'refs/heads/main' }}
         id: bump_dry
         name: Compute next version (dry run)
-        uses: mathieudutour/github-tag-action@v6.2
+        uses: cycjimmy/semantic-release-action@v6
         with:
-          github_token: ${{ secrets.GH_TOKEN }}
-          tag_prefix: ${{ inputs.tag_prefix }}
-          default_bump: ${{ inputs.default_bump }}
+          branches: main
           dry_run: true
+          ci: false
+          tag_format: ${{ inputs.tag_prefix }}${version}
+          semantic_version: 24
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      - if: ${{ github.ref == 'refs/heads/main' && steps.bump_dry.outputs.new_tag != '' }}
+      # semantic-release intentionally does not publish docs/chore-only changes.
+      # Preserve the reusable workflow's historical default_bump contract by
+      # supplying that configured bump only when semantic-release found none.
+      - if: ${{ github.ref == 'refs/heads/main' }}
+        id: resolved_bump
+        name: Resolve configured default bump
+        env:
+          PREV: ${{ steps.bump_dry.outputs.last_release_version }}
+          NEXT: ${{ steps.bump_dry.outputs.new_release_version }}
+          NEXT_TAG: ${{ steps.bump_dry.outputs.new_release_git_tag }}
+          PREV_TAG: ${{ steps.bump_dry.outputs.last_release_git_tag }}
+          PREFIX: ${{ inputs.tag_prefix }}
+          DEFAULT_BUMP: ${{ inputs.default_bump }}
+        run: |
+          set -euo pipefail
+          if [ -n "$NEXT" ]; then
+            printf 'previous_version=%s\nnew_version=%s\nnew_tag=%s\nprevious_tag=%s\n' "$PREV" "$NEXT" "$NEXT_TAG" "$PREV_TAG" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$DEFAULT_BUMP" = "false" ] || [ -z "$DEFAULT_BUMP" ]; then
+            exit 0
+          fi
+          case "$DEFAULT_BUMP" in patch|minor|major) ;; *) echo "Unsupported default_bump: $DEFAULT_BUMP" >&2; exit 1 ;; esac
+          latest_tag="$(git tag --list "${PREFIX}*" --sort=-v:refname | head -n 1)"
+          previous_version="${latest_tag#"$PREFIX"}"
+          if [ -z "$latest_tag" ] || ! [[ "$previous_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            previous_version="0.0.0"
+            latest_tag=""
+          fi
+          IFS=. read -r major minor patch <<< "$previous_version"
+          case "$DEFAULT_BUMP" in
+            patch) next_version="$major.$minor.$((patch + 1))" ;;
+            minor) next_version="$major.$((minor + 1)).0" ;;
+            major) next_version="$((major + 1)).0.0" ;;
+          esac
+          printf 'previous_version=%s\nnew_version=%s\nnew_tag=%s%s\nprevious_tag=%s\n' "$previous_version" "$next_version" "$PREFIX" "$next_version" "$latest_tag" >> "$GITHUB_OUTPUT"
+
+      - if: ${{ github.ref == 'refs/heads/main' && steps.resolved_bump.outputs.new_version != '' }}
         id: tag_version
         name: Determine and push guarded tag
         env:
-          PREV: ${{ steps.bump_dry.outputs.previous_version }}
-          NEXT: ${{ steps.bump_dry.outputs.new_version }}
-          NEXT_TAG: ${{ steps.bump_dry.outputs.new_tag }}
-          PREV_TAG: ${{ steps.bump_dry.outputs.previous_tag }}
+          PREV: ${{ steps.resolved_bump.outputs.previous_version }}
+          NEXT: ${{ steps.resolved_bump.outputs.new_version }}
+          NEXT_TAG: ${{ steps.resolved_bump.outputs.new_tag }}
+          PREV_TAG: ${{ steps.resolved_bump.outputs.previous_tag }}
           ALLOW_MAJOR: ${{ inputs.allow_major_version_bump }}
           PREFIX: ${{ inputs.tag_prefix }}
         run: |
