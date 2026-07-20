@@ -80,7 +80,7 @@ on:
         required: false
         default: 'false'
         description: >-
-          Bump level (github-tag-action semantics) applied on a CD run when NO
+          Bump level (conventional-commit semantics) applied on a CD run when NO
           conventional commit since the last tag implies one. Default 'false':
           docs/chore/ci-only merges cut no tag and publish nothing (GoReleaser is
           skipped). Set 'patch' to release on every merge to main.
@@ -93,14 +93,14 @@ on:
           would bump the MAJOR version is CAPPED to a minor bump, and a warning
           is logged. This is the guard against an accidental v0->v1 (or vN->vN+1)
           jump from a `feat!:` / `BREAKING CHANGE:` commit — which
-          github-tag-action treats as a major bump regardless of any
+          conventional-commit parsing treats as a major bump regardless of any
           major_string_token sentinel. Pre-1.0, a breaking change is a minor
           bump; this preserves that. Set true only to intend a real major
           release (or push an explicit vX.0.0 tag, which bypasses the bump).
     outputs:
       tag:
         description: >-
-          The tag github-tag-action created this run, or empty when no tag was
+          The tag created by this workflow, or empty when no tag was
           cut (no bumping commits) or the run was already on a tag. Consumers can
           chain per-repo publisher jobs on `needs.<job>.outputs.tag`.
         value: ${{ jobs.release.outputs.tag }}
@@ -119,8 +119,8 @@ jobs:
 
     steps:
       # 1. Checkout the code with full history + all tags. Both GoReleaser (changelog /
-      #    "current tag" detection) and github-tag-action (deriving the next version from
-      #    commits since the last tag) fail or under-tag on the default shallow clone.
+      #    "current tag" detection) and the version bump step (deriving the next version
+      #    from commits since the last tag) fail or under-tag on the default shallow clone.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -142,29 +142,68 @@ jobs:
       # an explicit "push a vX.Y.Z tag to release" flow while still sharing this
       # workflow — no auto-bump can override the tag they chose.
       #
-      # The bump is two steps: a dry run computes the version github-tag-action
-      # would choose from conventional commits, then a guard caps an accidental
+      # The bump is two steps: a dry run computes the next version from conventional commits,
+      # then a guard caps an accidental
       # MAJOR bump to a minor one (unless allow_major_version_bump) and pushes the
       # final tag itself. We push with plain git (not the action) so the guard's
       # decision is authoritative and the tag string is unambiguous.
       - name: Compute next version (dry run)
         id: bump_dry
         if: ${{ github.ref_type != 'tag' }}
-        uses: mathieudutour/github-tag-action@v6.2
+        uses: cycjimmy/semantic-release-action@v6
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          tag_prefix: ${{ inputs.tag_prefix }}
-          default_bump: ${{ inputs.default_bump }}
+          branches: main
           dry_run: true
+          ci: false
+          tag_format: ${{ inputs.tag_prefix }}${version}
+          semantic_version: 24
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # semantic-release intentionally does not publish docs/chore-only changes.
+      # Preserve default_bump for callers that explicitly request a release.
+      - name: Resolve configured default bump
+        id: resolved_bump
+        if: ${{ github.ref == 'refs/heads/main' && github.ref_type != 'tag' }}
+        env:
+          PREV: ${{ steps.bump_dry.outputs.last_release_version }}
+          NEXT: ${{ steps.bump_dry.outputs.new_release_version }}
+          NEXT_TAG: ${{ steps.bump_dry.outputs.new_release_git_tag }}
+          PREV_TAG: ${{ steps.bump_dry.outputs.last_release_git_tag }}
+          PREFIX: ${{ inputs.tag_prefix }}
+          DEFAULT_BUMP: ${{ inputs.default_bump }}
+        run: |
+          set -euo pipefail
+          if [ -n "$NEXT" ]; then
+            printf 'previous_version=%s\nnew_version=%s\nnew_tag=%s\nprevious_tag=%s\n' "$PREV" "$NEXT" "$NEXT_TAG" "$PREV_TAG" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$DEFAULT_BUMP" = "false" ] || [ -z "$DEFAULT_BUMP" ]; then
+            exit 0
+          fi
+          case "$DEFAULT_BUMP" in patch|minor|major) ;; *) echo "Unsupported default_bump: $DEFAULT_BUMP" >&2; exit 1 ;; esac
+          latest_tag="$(git tag --list "${PREFIX}*" --sort=-v:refname | head -n 1)"
+          previous_version="${latest_tag#"$PREFIX"}"
+          if [ -z "$latest_tag" ] || ! [[ "$previous_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            previous_version="0.0.0"
+            latest_tag=""
+          fi
+          IFS=. read -r major minor patch <<< "$previous_version"
+          case "$DEFAULT_BUMP" in
+            patch) next_version="$major.$minor.$((patch + 1))" ;;
+            minor) next_version="$major.$((minor + 1)).0" ;;
+            major) next_version="$((major + 1)).0.0" ;;
+          esac
+          printf 'previous_version=%s\nnew_version=%s\nnew_tag=%s%s\nprevious_tag=%s\n' "$previous_version" "$next_version" "$PREFIX" "$next_version" "$latest_tag" >> "$GITHUB_OUTPUT"
 
       - name: Determine and push guarded tag
         id: tag
-        if: ${{ github.ref_type != 'tag' && steps.bump_dry.outputs.new_tag != '' }}
+        if: ${{ github.ref == 'refs/heads/main' && github.ref_type != 'tag' && steps.resolved_bump.outputs.new_version != '' }}
         env:
-          PREV: ${{ steps.bump_dry.outputs.previous_version }}
-          NEXT: ${{ steps.bump_dry.outputs.new_version }}
-          NEXT_TAG: ${{ steps.bump_dry.outputs.new_tag }}
-          PREV_TAG: ${{ steps.bump_dry.outputs.previous_tag }}
+          PREV: ${{ steps.resolved_bump.outputs.previous_version }}
+          NEXT: ${{ steps.resolved_bump.outputs.new_version }}
+          NEXT_TAG: ${{ steps.resolved_bump.outputs.new_tag }}
+          PREV_TAG: ${{ steps.resolved_bump.outputs.previous_tag }}
           ALLOW_MAJOR: ${{ inputs.allow_major_version_bump }}
           PREFIX: ${{ inputs.tag_prefix }}
         run: |
