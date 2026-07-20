@@ -87,6 +87,37 @@ on:
           messages (no release for docs/chore/ci-only changes).
         required: false
         default: 'patch'
+      build_command:
+        type: string
+        description: >-
+          Shell command executed by the Build job after dependencies are downloaded.
+          Defaults to validating every package with `go build ./...`.
+        required: false
+        default: 'go build ./...'
+      artifact_name:
+        type: string
+        description: >-
+          Optional name for a Build-job artifact. Set together with artifact_path
+          to publish a deployable build output from this same job.
+        required: false
+        default: ''
+      artifact_path:
+        type: string
+        description: >-
+          Optional newline-separated artifact paths, relative to the repository root.
+          Set together with artifact_name.
+        required: false
+        default: ''
+      artifact_retention_days:
+        type: number
+        description: Number of days to retain an optional Build-job artifact.
+        required: false
+        default: 7
+      artifact_on_main_only:
+        type: boolean
+        description: Upload an optional Build-job artifact only for main-branch runs.
+        required: false
+        default: false
 
 jobs:
 
@@ -261,8 +292,19 @@ jobs:
         env:
           GOPRIVATE: ${{ inputs.GOPRIVATE }}
 
-      - run: go build ./...
+      - name: Build
+        run: ${{ inputs.build_command }}
         shell: bash
+
+      - name: Upload build artifact
+        if: ${{ inputs.artifact_name != '' && inputs.artifact_path != '' && (!inputs.artifact_on_main_only || github.ref == 'refs/heads/main') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ inputs.artifact_path }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: ${{ inputs.artifact_retention_days }}
 
   go_bump:
     name: Bump version
