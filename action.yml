@@ -46,7 +46,8 @@ runs:
   using: "composite"
   steps:
 
-    - run: go get ./...
+    # CI must fetch dependencies without changing the caller's go.mod/go.sum.
+    - run: go mod download all
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
@@ -90,7 +91,10 @@ runs:
 
         # Optional: if set to true then the all caching functionality will be complete disabled,
         #           takes precedence over all other caching options.
-        # skip-cache: true
+        # A cache restore/save can cost longer than the lint analysis itself.
+        # Keep this composite action's timing stable; callers may cache Go
+        # modules/build artifacts in their enclosing workflow if needed.
+        skip-cache: true
 
         # Optional: if set to true then the action don't cache or restore ~/go/pkg.
         # skip-pkg-cache: true

@@ -11,6 +11,7 @@ on:
       - 'src/**'
       - 'go.*'
       - '*.go'
+      - 'action.yml'
   pull_request:
     branches:
       - '**'
@@ -19,6 +20,7 @@ on:
       - 'src/**'
       - 'go.*'
       - '*.go'
+      - 'action.yml'
 
 jobs:
 
@@ -104,9 +106,29 @@ jobs:
         run: test "$ACTUAL" = 'v0.1.0'
 
   strongo_workflow:
-#    permissions:
-#      contents: write
-    uses: strongo/cicd/.github/workflows/workflow.yml@main
+    # The reusable workflow statically declares contents: write for its
+    # version-bump job, even when bumping is disabled at runtime.
+    permissions:
+      contents: write
+    uses: ./.github/workflows/workflow.yml
 
     secrets:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  composite_action:
+    name: Composite action smoke test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          cache: false
+
+      - uses: ./
+        with:
+          github_token: ${{ github.token }}
+          push_tag: 'false'

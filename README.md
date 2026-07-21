@@ -49,6 +49,22 @@ discouraged for the reasons above.
 > Existing `@main` consumers are **not** being mass-migrated. Adopt `@v1` (or the
 > Renovate preset) gradually, per repo, on your own schedule.
 
+## CI cache policy
+
+The reusable Go workflow restores a single cache of Go modules and compiled Go
+packages in both parallel jobs. Only **Build & test** may save a missing cache
+key, and only after a successful build and test run. This avoids a cold-cache
+race in which both jobs attempt to reserve and upload the same key.
+
+The key is deterministic for the runner OS/architecture, Go 1.26, CGO setting,
+and the selected module's `go.sum`. The workflow intentionally disables the
+`golangci-lint-action` cache: its archive/restore overhead can exceed the lint
+analysis time and makes otherwise identical runs vary by minutes.
+
+The composite action also disables that linter cache and uses `go mod download
+all` rather than `go get ./...`, so CI never rewrites a consumer's dependency
+requirements.
+
 ## Releasing with `release.yml`
 
 `release.yml` runs the GoReleaser flow: checkout (full history) → setup-go →
