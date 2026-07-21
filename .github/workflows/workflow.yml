@@ -147,7 +147,7 @@ jobs:
       # The key includes every Go input that can affect compiled artifacts.
       - name: Restore Go dependencies and build cache
         id: restore_go_cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: |
             ~/go/pkg/mod
@@ -218,7 +218,7 @@ jobs:
 
       - name: Restore Go dependencies and build cache
         id: restore_go_cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: |
             ~/go/pkg/mod
@@ -321,7 +321,7 @@ jobs:
       # parallel setup-go cache reservation race in cold CI runs.
       - name: Save Go dependencies and build cache
         if: ${{ success() && steps.restore_go_cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: |
             ~/go/pkg/mod
