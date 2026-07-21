@@ -326,7 +326,11 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-cache-${{ runner.os }}-${{ runner.arch }}-go1.26-cgo${{ inputs.cgo_enabled && '1' || '0' }}-${{ hashFiles(format('{0}/go.sum', inputs.working_directory)) }}
+          # Preserve the key evaluated before Go commands run. `go mod download
+          # all` may add checksums to go.sum, and recomputing hashFiles here
+          # would save a cache under a key that the next clean checkout never
+          # restores.
+          key: ${{ steps.restore_go_cache.outputs.cache-primary-key }}
 
   go_bump:
     name: Bump version
