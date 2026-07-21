@@ -56,8 +56,9 @@ packages in both parallel jobs. Only **Build & test** may save a missing cache
 key, and only after a successful build and test run. This avoids a cold-cache
 race in which both jobs attempt to reserve and upload the same key.
 
-The key is deterministic for the runner OS/architecture, Go 1.26, CGO setting,
-and the selected module's `go.sum`. The workflow intentionally disables the
+The key is determined before Go commands run, from the runner OS/architecture,
+Go 1.26, CGO setting, and the selected module's `go.sum`; the matching primary
+key is also used for the sole save. The workflow intentionally disables the
 `golangci-lint-action` cache: its archive/restore overhead can exceed the lint
 analysis time and makes otherwise identical runs vary by minutes.
 
