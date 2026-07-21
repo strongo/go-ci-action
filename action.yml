@@ -6,7 +6,7 @@ inputs:
     required: false
     default: '3m'
   github_token:
-    description: 'GitHub secret token'
+    description: 'GitHub token used to push a version tag and (when enabled) upload coverage'
     required: true
   code_coverage:
     description: set to `true` to run code coverage with Coveralls
@@ -31,6 +31,14 @@ inputs:
       push to main. IMPORTANT: for tagging to see commits that sit BEHIND a merge commit,
       the calling workflow MUST run actions/checkout with `fetch-depth: 0` (the default
       shallow clone only exposes HEADs message). See the README.
+    required: false
+    default: 'false'
+  tag_prefix:
+    description: 'Prefix for version tags, e.g. "ingitdb/v" for a subdirectory module. Defaults to "v".'
+    required: false
+    default: 'v'
+  allow_major_version_bump:
+    description: 'Allow an automatic major SemVer bump. Defaults to false so a breaking change under v0 remains a minor bump.'
     required: false
     default: 'false'
 
@@ -90,13 +98,99 @@ runs:
         # Optional: if set to true then the action don't cache or restore ~/.cache/go-build.
         # skip-build-cache: true
 
+    # git-cliff calculates versions from Git history and tags without requiring
+    # package metadata. The config is runner-local so callers need no new files.
     - if: ${{ github.ref == 'refs/heads/main' && inputs.push_tag == 'true' }}
-      name: Bump version and push tag
-      id: tag_version
-      uses: mathieudutour/github-tag-action@v6.2
+      name: Prepare git-cliff configuration
+      shell: bash
+      run: |
+        printf '%s\n' \
+          '[bump]' \
+          'initial_tag = "0.0.0"' \
+          'features_always_bump_minor = true' \
+          'breaking_always_bump_major = false' \
+          '[git]' \
+          'commit_parsers = [{ message = "^(chore|ci|docs|refactor)(\\(.+\\))?:", skip = true }]' \
+          > "${RUNNER_TEMP}/cicd-git-cliff.toml"
+
+    - if: ${{ github.ref == 'refs/heads/main' && inputs.push_tag == 'true' }}
+      id: bump_dry
+      name: Compute next version from Git history
+      uses: orhun/git-cliff-action@v4.8.0
       with:
-        github_token: ${{ inputs.github_token }}
-        default_bump: ${{ inputs.default_bump }}
+        version: v2.13.1
+        config: ${{ runner.temp }}/cicd-git-cliff.toml
+        args: >-
+          --bumped-version
+          --tag-pattern ^${{ inputs.tag_prefix }}[0-9]+\.[0-9]+\.[0-9]+$
+
+    - if: ${{ github.ref == 'refs/heads/main' && inputs.push_tag == 'true' }}
+      id: resolved_bump
+      name: Resolve configured default bump
+      shell: bash
+      env:
+        PROPOSED_VERSION: ${{ steps.bump_dry.outputs.content }}
+        PREFIX: ${{ inputs.tag_prefix }}
+        DEFAULT_BUMP: ${{ inputs.default_bump }}
+      run: |
+        set -euo pipefail
+        latest_tag=""
+        while IFS= read -r candidate_tag; do
+          candidate_version="${candidate_tag#"$PREFIX"}"
+          if [[ "$candidate_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            latest_tag="$candidate_tag"
+            break
+          fi
+        done < <(git tag --list "${PREFIX}*" --sort=-v:refname)
+        previous_version="${latest_tag#"$PREFIX"}"
+        if [ -z "$latest_tag" ] || ! [[ "$previous_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          previous_version="0.0.0"
+          latest_tag=""
+        fi
+        proposed_tag="$(printf '%s' "$PROPOSED_VERSION" | tr -d '\r\n')"
+        next_version="${proposed_tag#"$PREFIX"}"
+        if [[ "$next_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && [ "$next_version" != "$previous_version" ]; then
+          printf 'previous_version=%s\nnew_version=%s\nnew_tag=%s%s\nprevious_tag=%s\n' "$previous_version" "$next_version" "$PREFIX" "$next_version" "$latest_tag" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        if [ "$DEFAULT_BUMP" = "false" ] || [ -z "$DEFAULT_BUMP" ]; then
+          exit 0
+        fi
+        case "$DEFAULT_BUMP" in patch|minor|major) ;; *) echo "Unsupported default_bump: $DEFAULT_BUMP" >&2; exit 1 ;; esac
+        IFS=. read -r major minor patch <<< "$previous_version"
+        case "$DEFAULT_BUMP" in
+          patch) next_version="$major.$minor.$((patch + 1))" ;;
+          minor) next_version="$major.$((minor + 1)).0" ;;
+          major) next_version="$((major + 1)).0.0" ;;
+        esac
+        printf 'previous_version=%s\nnew_version=%s\nnew_tag=%s%s\nprevious_tag=%s\n' "$previous_version" "$next_version" "$PREFIX" "$next_version" "$latest_tag" >> "$GITHUB_OUTPUT"
+
+    - if: ${{ github.ref == 'refs/heads/main' && inputs.push_tag == 'true' && steps.resolved_bump.outputs.new_version != '' }}
+      name: Determine and push guarded tag
+      id: tag_version
+      shell: bash
+      env:
+        PREV: ${{ steps.resolved_bump.outputs.previous_version }}
+        NEXT: ${{ steps.resolved_bump.outputs.new_version }}
+        NEXT_TAG: ${{ steps.resolved_bump.outputs.new_tag }}
+        PREV_TAG: ${{ steps.resolved_bump.outputs.previous_tag }}
+        ALLOW_MAJOR: ${{ inputs.allow_major_version_bump }}
+        PREFIX: ${{ inputs.tag_prefix }}
+        PUSH_TOKEN: ${{ inputs.github_token }}
+      run: |
+        set -euo pipefail
+        prev_major="${PREV%%.*}"
+        next_major="${NEXT%%.*}"
+        tag="$NEXT_TAG"
+        if [ "$ALLOW_MAJOR" != "true" ] && [ -n "$PREV" ] && [ "$next_major" -gt "$prev_major" ]; then
+          prev_minor="$(printf '%s' "$PREV" | cut -d. -f2)"
+          capped="${prev_major}.$((prev_minor + 1)).0"
+          tag="${PREFIX}${capped}"
+          echo "::warning title=Major bump blocked::A breaking commit since ${PREV_TAG} would bump the MAJOR version (${PREV} -> ${NEXT}). Capping to ${capped}. Set allow_major_version_bump: true to intend a real major."
+        fi
+        git remote set-url origin "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        git tag "$tag"
+        git push origin "refs/tags/$tag"
 
     - if: ${{ inputs.code_coverage }}
       name: Code coverage by Coveralls

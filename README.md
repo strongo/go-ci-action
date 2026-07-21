@@ -55,8 +55,8 @@ discouraged for the reasons above.
 optional auto-tag → `goreleaser release --clean` against **your repo's own**
 `.goreleaser.yaml`. Two trigger styles are supported:
 
-- **Push to `main`** — `github-tag-action` bumps from conventional commits and
-  releases the new tag (continuous delivery).
+- **Push to `main`** — git-cliff calculates the next version from conventional
+  commits and the shared workflow releases the new tag (continuous delivery).
 - **Push a `vX.Y.Z` tag** — the auto-bump step is skipped (the tag already fixes
   the version) and GoReleaser releases that exact tag. Use this for an explicit,
   human-gated "cut a release by pushing a tag" flow.
@@ -160,9 +160,16 @@ after the `extends`.
 
 ## Automatic version tagging
 
-On a push/merge to `main`, the `go_bump` job (workflow) / tag step (action) runs
-[`mathieudutour/github-tag-action`], which reads **conventional commits since the
-last tag** and pushes a new SemVer tag:
+On a push/merge to `main`, the `go_bump` job (workflow) / tag step (action) uses
+[git-cliff] to calculate a new SemVer version from **conventional commits since
+the last matching tag**. The shared workflow then applies its guard and pushes
+the tag with Git:
+
+We deliberately use git-cliff rather than semantic-release or an npm-oriented
+tag action. It is a language-neutral Git-history tool: callers need neither
+`package.json` nor any project-specific release metadata. It only proposes a
+version; this repository's explicit guard remains the authority that creates a
+tag, preserving our v0 policy and `default_bump` contract.
 
 | Commit type since last tag | Result |
 | --- | --- |
@@ -173,13 +180,14 @@ last tag** and pushes a new SemVer tag:
 
 ### Accidental-major guard (`allow_major_version_bump`)
 
-`github-tag-action` treats a `feat!:` / `BREAKING CHANGE:` commit as a **major**
-bump — and it does so **regardless** of the `major_string_token` sentinel, so
-setting that alone does **not** stop it. That is how a pre-1.0 repo silently
-jumped `v0.64.2 → v1.0.0` from a `feat(cli)!:` commit.
+git-cliff is configured to make a `feat!:` / `BREAKING CHANGE:` commit a
+**minor** bump while the current major is zero. The shared guard independently
+caps a proposed major bump when `allow_major_version_bump` is false. This keeps
+a pre-1.0 module on v0 unless a maintainer deliberately cuts v1.
 
-Both the reusable `workflow.yml` (`go_bump`) and `release.yml` (CD bump path)
-now guard against this: they compute the proposed version in a **dry run**, and
+The reusable `workflow.yml` (`go_bump`), `release.yml` (CD bump path), and the
+composite `action.yml` all guard against this: they compute a proposed version
+without writing a tag, and
 when `allow_major_version_bump` is `false` (the default) a bump that would raise
 the **major** version is **capped to a minor** bump of the previous version
 (`v0.64.2 → v0.65.0`; `v1.5.0 → v1.6.0`) with a `::warning::` in the log. Pre-1.0
@@ -189,7 +197,7 @@ or push an explicit `vX.0.0` tag (a tag push bypasses the bump entirely).
 
 ### Required repo settings (read this — it's why tags were being missed)
 
-`github-tag-action` derives the bump from the commit range `lastTag..HEAD`. Two
+git-cliff derives the bump from the commit range `lastTag..HEAD`. Two
 things must be true for it to see your `feat:`/`fix:` commits:
 
 1. **Full checkout.** The job checks out with **`fetch-depth: 0`** (fixed in this
@@ -249,4 +257,4 @@ We build with our own tooling:
 - **[DataTug](https://datatug.io)** — query & explore data
 <!-- /dev-approach -->
 
-[`mathieudutour/github-tag-action`]: https://github.com/mathieudutour/github-tag-action
+[`git-cliff`]: https://git-cliff.org/

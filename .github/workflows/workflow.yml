@@ -313,55 +313,71 @@ jobs:
           # is authenticated the same way the action's push used to be.
           token: ${{ secrets.GH_TOKEN }}
 
-      # Bump is two steps: a dry run computes the next version from conventional commits,
-      # then a guard caps an accidental MAJOR
-      # bump to a minor (unless allow_major_version_bump) and pushes the final
-      # tag with git. This closes the hole where a `feat!:` / `BREAKING CHANGE:`
-      # commit would jump a pre-1.0 module v0 -> v1: the major_string_token
-      # sentinel only blocks the `#major` token path, NOT conventional breaking
-      # changes, which would otherwise bump to a major.
+      # git-cliff is language-neutral: it calculates a SemVer bump from Git
+      # history and tags, without loading npm plugins or requiring package.json.
+      # It does not create a release; the guarded git-tag step below remains the
+      # sole publisher. Keep the config runner-local so consumers need no files.
+      - if: ${{ github.ref == 'refs/heads/main' }}
+        name: Prepare git-cliff configuration
+        run: |
+          printf '%s\n' \
+            '[bump]' \
+            'initial_tag = "0.0.0"' \
+            'features_always_bump_minor = true' \
+            'breaking_always_bump_major = false' \
+            '[git]' \
+            'commit_parsers = [{ message = "^(chore|ci|docs|refactor)(\\(.+\\))?:", skip = true }]' \
+            > "${RUNNER_TEMP}/cicd-git-cliff.toml"
+
+      # The action prints the proposed tag (with the configured prefix) to its
+      # `content` output; the resolver below converts it to bare SemVer.
+      # Full history above is required because git-cliff examines commits since
+      # the last matching tag. A breaking change under v0 is a minor bump.
       - if: ${{ github.ref == 'refs/heads/main' }}
         id: bump_dry
-        name: Compute next version (dry run)
-        uses: cycjimmy/semantic-release-action@v6
+        name: Compute next version from Git history
+        uses: orhun/git-cliff-action@v4.8.0
         with:
-          branches: main
-          dry_run: true
-          ci: false
-          tag_format: ${{ inputs.tag_prefix }}${version}
-          semantic_version: 24
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          version: v2.13.1
+          config: ${{ runner.temp }}/cicd-git-cliff.toml
+          args: >-
+            --bumped-version
+            --tag-pattern ^${{ inputs.tag_prefix }}[0-9]+\.[0-9]+\.[0-9]+$
 
-      # semantic-release intentionally does not publish docs/chore-only changes.
       # Preserve the reusable workflow's historical default_bump contract by
-      # supplying that configured bump only when semantic-release found none.
+      # applying that configured bump only when git-cliff found no semantic bump.
       - if: ${{ github.ref == 'refs/heads/main' }}
         id: resolved_bump
         name: Resolve configured default bump
         env:
-          PREV: ${{ steps.bump_dry.outputs.last_release_version }}
-          NEXT: ${{ steps.bump_dry.outputs.new_release_version }}
-          NEXT_TAG: ${{ steps.bump_dry.outputs.new_release_git_tag }}
-          PREV_TAG: ${{ steps.bump_dry.outputs.last_release_git_tag }}
+          PROPOSED_VERSION: ${{ steps.bump_dry.outputs.content }}
           PREFIX: ${{ inputs.tag_prefix }}
           DEFAULT_BUMP: ${{ inputs.default_bump }}
         run: |
           set -euo pipefail
-          if [ -n "$NEXT" ]; then
-            printf 'previous_version=%s\nnew_version=%s\nnew_tag=%s\nprevious_tag=%s\n' "$PREV" "$NEXT" "$NEXT_TAG" "$PREV_TAG" >> "$GITHUB_OUTPUT"
+          latest_tag=""
+          while IFS= read -r candidate_tag; do
+            candidate_version="${candidate_tag#"$PREFIX"}"
+            if [[ "$candidate_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              latest_tag="$candidate_tag"
+              break
+            fi
+          done < <(git tag --list "${PREFIX}*" --sort=-v:refname)
+          previous_version="${latest_tag#"$PREFIX"}"
+          if [ -z "$latest_tag" ] || ! [[ "$previous_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            previous_version="0.0.0"
+            latest_tag=""
+          fi
+          proposed_tag="$(printf '%s' "$PROPOSED_VERSION" | tr -d '\r\n')"
+          next_version="${proposed_tag#"$PREFIX"}"
+          if [[ "$next_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && [ "$next_version" != "$previous_version" ]; then
+            printf 'previous_version=%s\nnew_version=%s\nnew_tag=%s%s\nprevious_tag=%s\n' "$previous_version" "$next_version" "$PREFIX" "$next_version" "$latest_tag" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if [ "$DEFAULT_BUMP" = "false" ] || [ -z "$DEFAULT_BUMP" ]; then
             exit 0
           fi
           case "$DEFAULT_BUMP" in patch|minor|major) ;; *) echo "Unsupported default_bump: $DEFAULT_BUMP" >&2; exit 1 ;; esac
-          latest_tag="$(git tag --list "${PREFIX}*" --sort=-v:refname | head -n 1)"
-          previous_version="${latest_tag#"$PREFIX"}"
-          if [ -z "$latest_tag" ] || ! [[ "$previous_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            previous_version="0.0.0"
-            latest_tag=""
-          fi
           IFS=. read -r major minor patch <<< "$previous_version"
           case "$DEFAULT_BUMP" in
             patch) next_version="$major.$minor.$((patch + 1))" ;;
