@@ -212,18 +212,20 @@ this is exactly right — a breaking change is a minor bump until you deliberate
 cut `v1.0.0`. To intend a real major, either set `allow_major_version_bump: true`
 or push an explicit `vX.0.0` tag (a tag push bypasses the bump entirely).
 
-### Required repo settings (read this — it's why tags were being missed)
+### Release-history requirements
 
 git-cliff derives the bump from the commit range `lastTag..HEAD`. Two
 things must be true for it to see your `feat:`/`fix:` commits:
 
-1. **Full checkout.** The job checks out with **`fetch-depth: 0`** (fixed in this
-   repo). With the default shallow clone the action only sees `HEAD`'s message —
+1. **Full history and tags.** The reusable workflows check out with
+   **`fetch-depth: 0`**, and the composite action now fetches complete history
+   and tags before calculating. With only the default shallow clone, git-cliff sees
+   `HEAD`'s message —
    so a `Merge pull request #N …` merge commit (which is never
    conventional-commit-shaped) produced **no bump and no tag**, even when the
    merged branch was full of `feat:`/`fix:` commits. This was the cause of
-   releases needing hand-cut tags. If you consume the **composite `action.yml`**,
-   your *own* workflow must `actions/checkout` with `fetch-depth: 0`.
+   releases needing hand-cut tags. Composite-action callers no longer need to
+   configure a special checkout depth themselves.
 
 2. **Conventional commits reach `main`.** Choose one, and set it in your repo's
    **Settings → General → Pull Requests**:

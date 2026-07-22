@@ -148,15 +148,18 @@ jobs:
       # sole publisher. Keep the config runner-local so consumers need no files.
       - name: Prepare git-cliff configuration
         if: ${{ github.ref_type != 'tag' }}
+        env:
+          PREFIX: ${{ inputs.tag_prefix }}
         run: |
-          printf '%s\n' \
-            '[bump]' \
-            'initial_tag = "0.0.0"' \
-            'features_always_bump_minor = true' \
-            'breaking_always_bump_major = false' \
-            '[git]' \
-            'commit_parsers = [{ message = "^(chore|ci|docs|refactor)(\\(.+\\))?:", skip = true }]' \
-            > "${RUNNER_TEMP}/cicd-git-cliff.toml"
+          {
+            printf '%s\n' '[bump]'
+            printf 'initial_tag = "%s0.0.0"\n' "$PREFIX"
+            printf '%s\n' \
+              'features_always_bump_minor = true' \
+              'breaking_always_bump_major = false' \
+              '[git]' \
+              'commit_parsers = [{ message = "^(chore|ci|docs|refactor)(\\(.+\\))?:", skip = true }]'
+          } > "${RUNNER_TEMP}/cicd-git-cliff.toml"
 
       # The action prints the proposed tag (with the configured prefix) to its
       # `content` output; the resolver below converts it to bare SemVer.
@@ -183,6 +186,12 @@ jobs:
           DEFAULT_BUMP: ${{ inputs.default_bump }}
         run: |
           set -euo pipefail
+          version_is_greater() {
+            local candidate="$1"
+            local baseline="$2"
+            [ "$candidate" != "$baseline" ] &&
+              [ "$(printf '%s\n%s\n' "$baseline" "$candidate" | sort -V | tail -n 1)" = "$candidate" ]
+          }
           latest_tag=""
           while IFS= read -r candidate_tag; do
             candidate_version="${candidate_tag#"$PREFIX"}"
@@ -198,7 +207,7 @@ jobs:
           fi
           proposed_tag="$(printf '%s' "$PROPOSED_VERSION" | tr -d '\r\n')"
           next_version="${proposed_tag#"$PREFIX"}"
-          if [[ "$next_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && [ "$next_version" != "$previous_version" ]; then
+          if [[ "$next_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && version_is_greater "$next_version" "$previous_version"; then
             printf 'previous_version=%s\nnew_version=%s\nnew_tag=%s%s\nprevious_tag=%s\n' "$previous_version" "$next_version" "$PREFIX" "$next_version" "$latest_tag" >> "$GITHUB_OUTPUT"
             exit 0
           fi

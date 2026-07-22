@@ -46,18 +46,40 @@ jobs:
           make_fixture() {
             local name="$1"
             local message="$2"
+            local tag="${3-v0.1.0}"
             local repository="$fixture_root/$name"
             git init --initial-branch=main "$repository"
             git -C "$repository" config user.email 'release-test@example.invalid'
             git -C "$repository" config user.name 'Release Test'
             git -C "$repository" commit --allow-empty -m 'chore: bootstrap'
-            git -C "$repository" tag v0.1.0
+            if [ -n "$tag" ]; then
+              git -C "$repository" tag "$tag"
+            fi
             git -C "$repository" commit --allow-empty -m "$message"
             test ! -e "$repository/package.json"
           }
 
           make_fixture v0-breaking 'feat!: change public API'
           make_fixture docs-only 'docs(cli): explain calculation'
+          make_fixture prefixed-first 'fix: initial release' ''
+          make_fixture shallow-source 'fix: release after a shallow checkout'
+
+          git clone --depth 1 "file://${fixture_root}/shallow-source" "$fixture_root/shallow-clone"
+          test "$(git -C "$fixture_root/shallow-clone" rev-parse --is-shallow-repository)" = 'true'
+          test -z "$(git -C "$fixture_root/shallow-clone" tag --list 'v*')"
+
+      - name: Assert shallow callers recover complete history and tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          repository="${RUNNER_TEMP}/release-calculator-fixtures/shallow-clone"
+          if [ "$(git -C "$repository" rev-parse --is-shallow-repository)" = "true" ]; then
+            git -C "$repository" fetch --force --prune --tags --unshallow origin
+          else
+            git -C "$repository" fetch --force --prune --tags origin
+          fi
+          test "$(git -C "$repository" rev-parse --is-shallow-repository)" = 'false'
+          test "$(git -C "$repository" tag --list 'v*' --sort=-v:refname | head -n 1)" = 'v0.1.0'
 
       - name: Prepare git-cliff configuration
         shell: bash
@@ -70,6 +92,15 @@ jobs:
             '[git]' \
             'commit_parsers = [{ message = "^(chore|ci|docs|refactor)(\\(.+\\))?:", skip = true }]' \
             > "${RUNNER_TEMP}/cicd-git-cliff.toml"
+
+          printf '%s\n' \
+            '[bump]' \
+            'initial_tag = "backend/v0.0.0"' \
+            'features_always_bump_minor = true' \
+            'breaking_always_bump_major = false' \
+            '[git]' \
+            'commit_parsers = [{ message = "^(chore|ci|docs|refactor)(\\(.+\\))?:", skip = true }]' \
+            > "${RUNNER_TEMP}/cicd-git-cliff-prefixed.toml"
 
       - name: Compute a v0 breaking-change version
         id: v0_breaking
@@ -104,6 +135,50 @@ jobs:
         env:
           ACTUAL: ${{ steps.docs_only.outputs.content }}
         run: test "$ACTUAL" = 'v0.1.0'
+
+      - name: Compute a first prefixed version
+        id: prefixed_first
+        uses: orhun/git-cliff-action@v4.8.0
+        with:
+          version: v2.13.1
+          config: ${{ runner.temp }}/cicd-git-cliff-prefixed.toml
+          args: >-
+            --repository ${{ runner.temp }}/release-calculator-fixtures/prefixed-first
+            --bumped-version
+            --tag-pattern ^backend/v[0-9]+\.[0-9]+\.[0-9]+$
+
+      - name: Assert prefixed first-release behavior
+        shell: bash
+        env:
+          ACTUAL: ${{ steps.prefixed_first.outputs.content }}
+        run: test "$ACTUAL" = 'backend/v0.0.1'
+
+      - name: Assert version resolution is monotonic
+        shell: bash
+        run: |
+          set -euo pipefail
+          version_is_greater() {
+            local candidate="$1"
+            local baseline="$2"
+            [ "$candidate" != "$baseline" ] &&
+              [ "$(printf '%s\n%s\n' "$baseline" "$candidate" | sort -V | tail -n 1)" = "$candidate" ]
+          }
+
+          if version_is_greater '0.1.2' '0.1.3'; then
+            echo 'lower version was incorrectly accepted' >&2
+            exit 1
+          fi
+          if version_is_greater '0.1.3' '0.1.3'; then
+            echo 'equal version was incorrectly accepted' >&2
+            exit 1
+          fi
+          version_is_greater '0.1.4' '0.1.3'
+          version_is_greater '0.10.0' '0.9.9'
+
+          previous_version='0.1.3'
+          IFS=. read -r major minor patch <<< "$previous_version"
+          fallback_version="$major.$minor.$((patch + 1))"
+          test "$fallback_version" = '0.1.4'
 
   strongo_workflow:
     # The reusable workflow statically declares contents: write for its

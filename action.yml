@@ -28,9 +28,7 @@ inputs:
       Bump level applied when no conventional commit since the last tag implies one.
       "false" (default) cuts a tag only when the commits since the last tag contain
       feat:/fix:/BREAKING messages; set to "patch"/"minor"/"major" to always bump on a
-      push to main. IMPORTANT: for tagging to see commits that sit BEHIND a merge commit,
-      the calling workflow MUST run actions/checkout with `fetch-depth: 0` (the default
-      shallow clone only exposes HEADs message). See the README.
+      push to main. The action fetches complete history and tags before calculating.
     required: false
     default: 'false'
   tag_prefix:
@@ -102,20 +100,37 @@ runs:
         # Optional: if set to true then the action don't cache or restore ~/.cache/go-build.
         # skip-build-cache: true
 
+    # Composite-action callers commonly use checkout's shallow default. Fetch
+    # the full history and all tags here so release correctness does not depend
+    # on every caller remembering a special checkout setting.
+    - if: ${{ github.ref == 'refs/heads/main' && inputs.push_tag == 'true' }}
+      name: Fetch complete Git history and tags
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+          git fetch --force --prune --tags --unshallow origin
+        else
+          git fetch --force --prune --tags origin
+        fi
+
     # git-cliff calculates versions from Git history and tags without requiring
     # package metadata. The config is runner-local so callers need no new files.
     - if: ${{ github.ref == 'refs/heads/main' && inputs.push_tag == 'true' }}
       name: Prepare git-cliff configuration
       shell: bash
+      env:
+        PREFIX: ${{ inputs.tag_prefix }}
       run: |
-        printf '%s\n' \
-          '[bump]' \
-          'initial_tag = "0.0.0"' \
-          'features_always_bump_minor = true' \
-          'breaking_always_bump_major = false' \
-          '[git]' \
-          'commit_parsers = [{ message = "^(chore|ci|docs|refactor)(\\(.+\\))?:", skip = true }]' \
-          > "${RUNNER_TEMP}/cicd-git-cliff.toml"
+        {
+          printf '%s\n' '[bump]'
+          printf 'initial_tag = "%s0.0.0"\n' "$PREFIX"
+          printf '%s\n' \
+            'features_always_bump_minor = true' \
+            'breaking_always_bump_major = false' \
+            '[git]' \
+            'commit_parsers = [{ message = "^(chore|ci|docs|refactor)(\\(.+\\))?:", skip = true }]'
+        } > "${RUNNER_TEMP}/cicd-git-cliff.toml"
 
     - if: ${{ github.ref == 'refs/heads/main' && inputs.push_tag == 'true' }}
       id: bump_dry
@@ -138,6 +153,12 @@ runs:
         DEFAULT_BUMP: ${{ inputs.default_bump }}
       run: |
         set -euo pipefail
+        version_is_greater() {
+          local candidate="$1"
+          local baseline="$2"
+          [ "$candidate" != "$baseline" ] &&
+            [ "$(printf '%s\n%s\n' "$baseline" "$candidate" | sort -V | tail -n 1)" = "$candidate" ]
+        }
         latest_tag=""
         while IFS= read -r candidate_tag; do
           candidate_version="${candidate_tag#"$PREFIX"}"
@@ -153,7 +174,7 @@ runs:
         fi
         proposed_tag="$(printf '%s' "$PROPOSED_VERSION" | tr -d '\r\n')"
         next_version="${proposed_tag#"$PREFIX"}"
-        if [[ "$next_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && [ "$next_version" != "$previous_version" ]; then
+        if [[ "$next_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && version_is_greater "$next_version" "$previous_version"; then
           printf 'previous_version=%s\nnew_version=%s\nnew_tag=%s%s\nprevious_tag=%s\n' "$previous_version" "$next_version" "$PREFIX" "$next_version" "$latest_tag" >> "$GITHUB_OUTPUT"
           exit 0
         fi
