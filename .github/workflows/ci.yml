@@ -147,11 +147,13 @@ jobs:
             --bumped-version
             --tag-pattern ^backend/v[0-9]+\.[0-9]+\.[0-9]+$
 
-      - name: Assert prefixed first-release behavior
+      - name: Assert prefixed initial-version behavior
         shell: bash
         env:
           ACTUAL: ${{ steps.prefixed_first.outputs.content }}
-        run: test "$ACTUAL" = 'backend/v0.0.1'
+        # With no existing tags git-cliff returns initial_tag itself. The
+        # resolver then applies default_bump when the caller requests one.
+        run: test "$ACTUAL" = 'backend/v0.0.0'
 
       - name: Assert version resolution is monotonic
         shell: bash
