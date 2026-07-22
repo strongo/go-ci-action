@@ -58,13 +58,17 @@ race in which both jobs attempt to reserve and upload the same key.
 
 The key is determined before Go commands run, from the runner OS/architecture,
 Go 1.26, CGO setting, and the selected module's `go.sum`; the matching primary
-key is also used for the sole save. The workflow intentionally disables the
-`golangci-lint-action` cache: its archive/restore overhead can exceed the lint
-analysis time and makes otherwise identical runs vary by minutes.
+key is also used for the sole save. The reusable workflow enables the separate
+`golangci-lint-action` analysis cache by default. Callers can set
+`golangci_lint_cache: false` when cache transfer is slower than linting for a
+particular repository. `golangci_lint_cache_invalidation_interval` controls how
+many days a lint-cache namespace remains reusable and defaults to the action's
+seven-day policy.
 
-The composite action also disables that linter cache and uses `go mod download
-all` rather than `go get ./...`, so CI never rewrites a consumer's dependency
-requirements.
+The composite action keeps that linter cache disabled; it has a separate input
+surface and is not part of this reusable-workflow timing policy. It uses `go
+mod download all` rather than `go get ./...`, so CI never rewrites a consumer's
+dependency requirements.
 
 ## Releasing with `release.yml`
 
