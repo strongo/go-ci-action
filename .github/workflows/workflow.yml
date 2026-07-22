@@ -35,6 +35,11 @@ on:
         description: 'Restore and save the golangci-lint analysis cache. Disable if cache transfer is slower than linting.'
         required: false
         default: true
+      golangci_lint_cache_invalidation_interval:
+        type: number
+        description: 'Days between fresh golangci-lint cache namespaces.'
+        required: false
+        default: 7
       GOOGLE_APPLICATION_CREDENTIALS:
         type: string
         description: 'Path to Google Application Credentials file'
@@ -191,6 +196,7 @@ jobs:
           # Optional: if set to true then the all caching functionality will be complete disabled,
           #           takes precedence over all other caching options.
           skip-cache: ${{ !inputs.golangci_lint_cache }}
+          cache-invalidation-interval: ${{ inputs.golangci_lint_cache_invalidation_interval }}
 
           # Optional: if set to true then the action don't cache or restore ~/.cache/go-build.
           # skip-build-cache: true

@@ -61,7 +61,9 @@ Go 1.26, CGO setting, and the selected module's `go.sum`; the matching primary
 key is also used for the sole save. The reusable workflow enables the separate
 `golangci-lint-action` analysis cache by default. Callers can set
 `golangci_lint_cache: false` when cache transfer is slower than linting for a
-particular repository.
+particular repository. `golangci_lint_cache_invalidation_interval` controls how
+many days a lint-cache namespace remains reusable and defaults to the action's
+seven-day policy.
 
 The composite action keeps that linter cache disabled; it has a separate input
 surface and is not part of this reusable-workflow timing policy. It uses `go
