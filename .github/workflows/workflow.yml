@@ -30,6 +30,11 @@ on:
         description: 'How long to wait for lint to complete before failing'
         required: false
         default: '3m'
+      golangci_lint_cache:
+        type: boolean
+        description: 'Restore and save the golangci-lint analysis cache. Disable if cache transfer is slower than linting.'
+        required: false
+        default: true
       GOOGLE_APPLICATION_CREDENTIALS:
         type: string
         description: 'Path to Google Application Credentials file'
@@ -185,10 +190,7 @@ jobs:
 
           # Optional: if set to true then the all caching functionality will be complete disabled,
           #           takes precedence over all other caching options.
-          # The action cache is intentionally disabled. Its ~120 MB restore and
-          # save frequently cost more than the analysis it avoids, and periodic
-          # invalidation creates multi-minute post-job variance.
-          skip-cache: true
+          skip-cache: ${{ !inputs.golangci_lint_cache }}
 
           # Optional: if set to true then the action don't cache or restore ~/.cache/go-build.
           # skip-build-cache: true
